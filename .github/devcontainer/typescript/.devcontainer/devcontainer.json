@@ -1,0 +1,14 @@
+{
+  "name": "Mairie-de-Saint-Jean-Cap-Ferrat/basic-env - JavaScript",
+  "image": "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/base:latest",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts",
+      "installYarnUsingApt": false
+    },
+    "ghcr.io/devcontainers/features"
+  },
+  
+  "remoteUser": "coder"
+}

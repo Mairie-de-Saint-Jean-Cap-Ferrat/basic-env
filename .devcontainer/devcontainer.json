@@ -16,9 +16,30 @@
   },
 
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers/features/terraform:1": {},
-    "ghcr.io/phorcys420/devcontainer-features/coder:1": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": true,
+      "azureDnsAutoDetection": true,
+      "installDockerBuildx": true,
+      "installDockerComposeSwitch": true,
+      "disableIp6tables": true,
+      "version": "latest",
+      "dockerDashComposeVersion": "v2"
+    },
+    "ghcr.io/devcontainers/features/terraform:1": {
+      "installSentinel": true,
+      "installTFsec": true,
+      "version": "latest",
+      "tflint": "latest",
+      "terragrunt": "latest"
+    },
+    "ghcr.io/devcontainers-extra/features/terraform-docs:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers-extra/features/tailscale:1": {},
+    "ghcr.io/phorcys420/devcontainer-features/coder:1": {},
+    "ghcr.io/devcontainers-extra/features/vscode-server:1": {
+      "version": "insider"
+    }
   },
 
   "remoteUser": "node",
