@@ -1,5 +1,5 @@
 {
-  "name": "mairie-de-saint-jean-cap-ferrat/basic-env - Base",
+  "name": "mairie-de-saint-jean-cap-ferrat/basic-env - base",
 
   "build": {
     "dockerfile": "Dockerfile"
