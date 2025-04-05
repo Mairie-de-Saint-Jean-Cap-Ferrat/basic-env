@@ -1,4 +1,4 @@
-FROM ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/base:latest
+FROM ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest
 
 USER root
 

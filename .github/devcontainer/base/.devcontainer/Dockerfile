@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM debian:latest
 
 USER root
 
@@ -21,7 +21,7 @@ RUN apt update -y && \
     sudo doas
 
 # Delete ubuntu user (because it's UID is 1000 and collides with the coder user, but we still want to comply with the codercom/enterprise-base:latest image)
-RUN userdel ubuntu
+RUN userdel debian
 
 # Create coder user
 RUN useradd coder --create-home --shell=/bin/bash --uid=1000 --user-group && \
@@ -76,4 +76,4 @@ RUN cp /etc/zsh/newuser.zshrc.recommended $HOME/.zshrc
 # Extensions gallery for code-server (Microsoft instead of OpenVSIX -> for when you use coder/code-server)
 ENV EXTENSIONS_GALLERY='{"serviceUrl":"https://marketplace.visualstudio.com/_apis/public/gallery","cacheUrl":"https://vscode.blob.core.windows.net/gallery/index","itemUrl":"https://marketplace.visualstudio.com/items","controlUrl":"","recommendationsUrl":""}'
 ENV DEBIAN_FRONTEND="dialog"
-ENV LANG="en_US.UTF-8"
+ENV LANG="fr_FR.UTF-8"
