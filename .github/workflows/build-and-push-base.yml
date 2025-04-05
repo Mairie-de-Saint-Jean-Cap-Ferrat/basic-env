@@ -8,6 +8,6 @@ on:
 
 jobs:
   build:
-    uses: mairie-de-saint-jean-cap-ferrat/basic-env/.github/workflows/_build-and-push.yml@main
+    uses: Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/.github/workflows/_build-and-push.yml@main
     with:
       image: base

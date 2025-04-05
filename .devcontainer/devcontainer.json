@@ -32,14 +32,9 @@
       "tflint": "latest",
       "terragrunt": "latest"
     },
-    "ghcr.io/devcontainers-extra/features/terraform-docs:1": {
-      "version": "latest"
-    },
     "ghcr.io/devcontainers-extra/features/tailscale:1": {},
     "ghcr.io/phorcys420/devcontainer-features/coder:1": {},
-    "ghcr.io/devcontainers-extra/features/vscode-server:1": {
-      "version": "insider"
-    }
+    "ghcr.io/devcontainers-extra/features/vscode-server:1": {}
   },
 
   "remoteUser": "node",
