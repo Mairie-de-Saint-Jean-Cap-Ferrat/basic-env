@@ -1,4 +1,4 @@
-FROM ghcr.io/uwu/basic-env/base:latest
+FROM ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/base:latest
 
 USER root
 

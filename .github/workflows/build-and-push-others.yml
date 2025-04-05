@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    uses: uwu/basic-env/.github/workflows/_build-and-push.yml@main
+    uses: Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/.github/workflows/_build-and-push.yml@main
     strategy:
       matrix:
         image: [dart, java, javascript]

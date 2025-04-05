@@ -1,6 +1,6 @@
 {
-  "name": "uwu/basic-env - Java",
-  "image": "ghcr.io/uwu/basic-env/base:latest",
+  "name": "Mairie-de-Saint-Jean-Cap-Ferrat/basic-env - Java",
+  "image": "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/base:latest",
 
   "features": {
     "ghcr.io/devcontainers/features/java:1": {

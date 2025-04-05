@@ -1,5 +1,5 @@
 {
-  "name": "uwu/basic-env - Dart",
+  "name": "Mairie-de-Saint-Jean-Cap-Ferrat/basic-env - Dart",
 
   "build": {
     "dockerfile": "Dockerfile"

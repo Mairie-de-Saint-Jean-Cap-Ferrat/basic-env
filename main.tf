@@ -20,8 +20,11 @@ locals {
 
   images = {
     javascript = docker_image.javascript
-    dart = docker_image.dart
+    typescript = docker_image.typescript
+    php = docker_image.php
     java = docker_image.java
+    python = docker_image.python
+    base = docker_image.base
   }
 }
 
@@ -94,10 +97,10 @@ EOT
 
 data "coder_parameter" "docker_image" {
   name        = "Docker Image"
-  description = "Which Docker image do you want to use?"
+  description = "Quelle image ?"
 
   type    = "string"
-  default = "javascript"
+  default = "base"
 
   order = 1
 
@@ -109,14 +112,25 @@ data "coder_parameter" "docker_image" {
   }
 
   option {
-    name  = "Dart"
-    value = "dart"
+    name  = "Typescript"
+    value = "typescript"
+  }
+
+  option {
+    name  = "PHP"
+    value = "php"
   }
 
   option {
     name  = "Java"
     value = "java"
   }
+
+  option {
+    name  = "Python"
+    value = "python"
+  }
+
 
   option {
     name  = "Base"
@@ -126,7 +140,7 @@ data "coder_parameter" "docker_image" {
 
 data "coder_parameter" "shell" {
   name        = "Shell"
-  description = "Which shell do you want to be your default shell?"
+  description = "Quel shell par défaut ?"
 
   type    = "string"
   default = "bash"
@@ -153,7 +167,7 @@ data "coder_parameter" "shell" {
 
 data "coder_parameter" "vnc" {
   name        = "VNC"
-  description = "Do you want to enable VNC?"
+  description = "Activer VNC?"
 
   order = 3
 
@@ -165,7 +179,7 @@ data "coder_parameter" "vnc" {
 
 data "coder_parameter" "vscode_binary" {
   name        = "VS Code Channel"
-  description = "Which VS Code channel do you want to use?"
+  description = "Quelle version de VS Code ?"
 
   type    = "string"
   default = "code"
@@ -312,7 +326,7 @@ resource "coder_metadata" "home" {
 data "docker_registry_image" "javascript" {
   count = data.coder_parameter.docker_image.value == "javascript" ? 1 : 0
 
-  name = "ghcr.io/uwu/basic-env/javascript:latest"
+  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/javascript-node:latest"
 }
 
 resource "docker_image" "javascript" {
@@ -322,23 +336,36 @@ resource "docker_image" "javascript" {
   pull_triggers = [data.docker_registry_image.javascript[0].sha256_digest]
 }
 
-data "docker_registry_image" "dart" {
-  count = data.coder_parameter.docker_image.value == "dart" ? 1 : 0
+data "docker_registry_image" "typescript" {
+  count = data.coder_parameter.docker_image.value == "typescript" ? 1 : 0
 
-  name = "ghcr.io/uwu/basic-env/dart:latest"
+  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/typescript-node:latest"
 }
 
-resource "docker_image" "dart" {
-  count = data.coder_parameter.docker_image.value == "dart" ? 1 : 0
+resource "docker_image" "typescript" {
+  count = data.coder_parameter.docker_image.value == "typescript" ? 1 : 0
 
-  name          = data.docker_registry_image.dart[0].name
-  pull_triggers = [data.docker_registry_image.dart[0].sha256_digest]
+  name          = data.docker_registry_image.typescript[0].name
+  pull_triggers = [data.docker_registry_image.typescript[0].sha256_digest]
+}
+
+data "docker_registry_image" "php" {
+  count = data.coder_parameter.docker_image.value == "php" ? 1 : 0
+
+  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/php:latest"
+}
+
+resource "docker_image" "php" {
+  count = data.coder_parameter.docker_image.value == "php" ? 1 : 0
+
+  name          = data.docker_registry_image.php[0].name
+  pull_triggers = [data.docker_registry_image.php[0].sha256_digest]
 }
 
 data "docker_registry_image" "java" {
   count = data.coder_parameter.docker_image.value == "java" ? 1 : 0
 
-  name = "ghcr.io/uwu/basic-env/java:latest"
+  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/java:latest"
 }
 
 resource "docker_image" "java" {
@@ -346,6 +373,32 @@ resource "docker_image" "java" {
 
   name          = data.docker_registry_image.java[0].name
   pull_triggers = [data.docker_registry_image.java[0].sha256_digest]
+}
+
+data "docker_registry_image" "python" {
+  count = data.coder_parameter.docker_image.value == "python" ? 1 : 0
+
+  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/python:latest"
+}
+
+resource "docker_image" "python" {
+  count = data.coder_parameter.docker_image.value == "python" ? 1 : 0
+
+  name          = data.docker_registry_image.python[0].name
+  pull_triggers = [data.docker_registry_image.python[0].sha256_digest]
+}
+
+data "docker_registry_image" "base" {
+  count = data.coder_parameter.docker_image.value == "base" ? 1 : 0
+
+  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/base:latest"
+}
+
+resource "docker_image" "base" {
+  count = data.coder_parameter.docker_image.value == "base" ? 1 : 0
+
+  name          = data.docker_registry_image.base[0].name
+  pull_triggers = [data.docker_registry_image.base[0].sha256_digest]
 }
 
 resource "coder_metadata" "javascript_image" {
@@ -361,16 +414,29 @@ resource "coder_metadata" "javascript_image" {
   }
 }
 
-resource "coder_metadata" "dart_image" {
-  count = data.coder_parameter.docker_image.value == "dart" ? 1 : 0
+resource "coder_metadata" "typescript_image" {
+  count = data.coder_parameter.docker_image.value == "typescript" ? 1 : 0
 
-  resource_id = docker_image.dart[0].id
+  resource_id = docker_image.typescript[0].id
 
   hide = true
 
   item {
     key   = "description"
-    value = "Dart container image"
+    value = "TypeScript container image"
+  }
+}
+
+resource "coder_metadata" "php_image" {
+  count = data.coder_parameter.docker_image.value == "php" ? 1 : 0
+
+  resource_id = docker_image.php[0].id
+
+  hide = true
+
+  item {
+    key   = "description"
+    value = "PHP container image"
   }
 }
 
@@ -387,6 +453,32 @@ resource "coder_metadata" "java_image" {
   }
 }
 
+resource "coder_metadata" "python_image" {
+  count = data.coder_parameter.docker_image.value == "python" ? 1 : 0
+
+  resource_id = docker_image.python[0].id
+
+  hide = true
+
+  item {
+    key   = "description"
+    value = "Python container image"
+  }
+}
+
+resource "coder_metadata" "base_image" {
+  count = data.coder_parameter.docker_image.value == "base" ? 1 : 0
+
+  resource_id = docker_image.base[0].id
+
+  hide = true
+
+  item {
+    key   = "description"
+    value = "Base container image"
+  }
+}
+
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
 
@@ -400,7 +492,10 @@ resource "docker_container" "workspace" {
   name     = "coder-${local.user_name}-${local.workspace_name}"
   hostname = local.workspace_name
 
-  dns      = ["1.1.1.1"]
+  dns      = [
+    "100.100.100.100",
+    "192.168.0.70"
+    ]
 
   entrypoint = ["sh", "-c", replace(coder_agent.dev.init_script, "127.0.0.1", "host.docker.internal")]
   env        = ["CODER_AGENT_TOKEN=${coder_agent.dev.token}"]

@@ -1,5 +1,5 @@
 {
-  "name": "uwu/basic-env - Base",
+  "name": "Mairie-de-Saint-Jean-Cap-Ferrat/basic-env - Base",
 
   "build": {
     "dockerfile": "Dockerfile"

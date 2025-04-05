@@ -5,12 +5,9 @@ on:
   push:
     branches:
       - "main"
-    pull_requests:
-      branches:
-        - "main"
 
 jobs:
   build:
-    uses: uwu/basic-env/.github/workflows/_build-and-push.yml@main
+    uses: Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/.github/workflows/_build-and-push.yml@main
     with:
       image: base
