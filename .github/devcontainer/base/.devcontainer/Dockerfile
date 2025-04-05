@@ -1,4 +1,4 @@
-FROM debian:latest
+FROM ubuntu:latest
 
 USER root
 
@@ -21,7 +21,7 @@ RUN apt update -y && \
     sudo doas
 
 # Delete ubuntu user (because it's UID is 1000 and collides with the coder user, but we still want to comply with the codercom/enterprise-base:latest image)
-RUN userdel debian
+RUN userdel ubuntu
 
 # Create coder user
 RUN useradd coder --create-home --shell=/bin/bash --uid=1000 --user-group && \
