@@ -7,7 +7,7 @@
       "version": "lts",
       "installYarnUsingApt": false
     },
-    "ghcr.io/devcontainers/features"
+    "ghcr.io/devcontainers/features/common-utils": {}
   },
   
   "remoteUser": "coder"
