@@ -1,5 +1,5 @@
 {
-  "name": "Mairie-de-Saint-Jean-Cap-Ferrat/basic-env - Java",
+  "name": "mairie-de-saint-jean-cap-ferrat/basic-env - Java",
   "image": "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest",
 
   "features": {

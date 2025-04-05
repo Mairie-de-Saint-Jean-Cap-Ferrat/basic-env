@@ -326,7 +326,7 @@ resource "coder_metadata" "home" {
 data "docker_registry_image" "javascript" {
   count = data.coder_parameter.docker_image.value == "javascript" ? 1 : 0
 
-  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/javascript-node:latest"
+  name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/javascript-node:latest"
 }
 
 resource "docker_image" "javascript" {
@@ -339,7 +339,7 @@ resource "docker_image" "javascript" {
 data "docker_registry_image" "typescript" {
   count = data.coder_parameter.docker_image.value == "typescript" ? 1 : 0
 
-  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/typescript-node:latest"
+  name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/typescript-node:latest"
 }
 
 resource "docker_image" "typescript" {
@@ -352,7 +352,7 @@ resource "docker_image" "typescript" {
 data "docker_registry_image" "php" {
   count = data.coder_parameter.docker_image.value == "php" ? 1 : 0
 
-  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/php:latest"
+  name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/php:latest"
 }
 
 resource "docker_image" "php" {
@@ -365,7 +365,7 @@ resource "docker_image" "php" {
 data "docker_registry_image" "java" {
   count = data.coder_parameter.docker_image.value == "java" ? 1 : 0
 
-  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/java:latest"
+  name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/java:latest"
 }
 
 resource "docker_image" "java" {
@@ -378,7 +378,7 @@ resource "docker_image" "java" {
 data "docker_registry_image" "python" {
   count = data.coder_parameter.docker_image.value == "python" ? 1 : 0
 
-  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/python:latest"
+  name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/python:latest"
 }
 
 resource "docker_image" "python" {
@@ -391,7 +391,7 @@ resource "docker_image" "python" {
 data "docker_registry_image" "base" {
   count = data.coder_parameter.docker_image.value == "base" ? 1 : 0
 
-  name = "ghcr.io/Mairie-de-Saint-Jean-Cap-Ferrat/basic-env/base:latest"
+  name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest"
 }
 
 resource "docker_image" "base" {
