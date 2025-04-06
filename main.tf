@@ -33,6 +33,11 @@ locals {
   
   # Flag to control GitHub integration
   github_auth_enabled = false
+  
+  # Owner related attributes to replace deprecated ones
+  owner_name = data.coder_workspace_owner.me.name
+  owner_email = data.coder_workspace_owner.me.email
+  owner_session_token = data.coder_workspace_owner.me.session_token
 }
 
 provider "docker" {
@@ -81,7 +86,10 @@ resource "coder_agent" "dev" {
     "SHELL"         = data.coder_parameter.shell.value,
     "VSCODE_BINARY" = data.coder_parameter.vscode_binary.value,
     "SUPERVISOR_DIR" = "/usr/share/basic-env/supervisor",
-    "GIT_REPO"      = data.coder_parameter.git_repository.value
+    "GIT_REPO"      = data.coder_parameter.git_repository.value,
+    "CODER_USER_TOKEN" = local.owner_session_token,
+    "GIT_USERNAME" = local.owner_name,
+    "GIT_EMAIL" = local.owner_email
   }
 
   startup_script = <<EOT
@@ -274,11 +282,11 @@ module "dotfiles-root" {
 
 module "git-config" {
   source = "registry.coder.com/modules/git-config/coder"
-  version = "1.0.0"  # Using specific version for compatibility
+  version = "2.0.1"  # Update to a newer version that uses non-deprecated attributes
   
   allow_username_change = true
   allow_email_change = true
-
+  
   agent_id = coder_agent.dev.id
 }
 
@@ -301,7 +309,7 @@ module "git-clone" {
 
 module "coder-login" {
   source   = "registry.coder.com/modules/coder-login/coder"
-  version  = "1.0.0"  # Use specific version for compatibility
+  version  = "2.0.1"  # Update to a newer version that uses non-deprecated attributes
   
   agent_id = coder_agent.dev.id
 }
