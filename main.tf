@@ -251,6 +251,95 @@ data "coder_parameter" "git_repository" {
   }
 }
 
+module "vscode-web" {
+  count          = data.coder_workspace.me.start_count
+  source         = "registry.coder.com/modules/vscode-web/coder"
+  auto_install_extensions = true
+  agent_id       = coder_agent.dev.id
+  accept_license = true
+  folder = "~/projects"
+  subdomain = false
+  use_cached = true
+  extensions = [
+    "mads-hartmann.bash-ide-vscode",
+    "mikestead.dotenv",
+    "vivaxy.vscode-conventional-commits",
+    "ms-azuretools.vscode-docker",
+    "EditorConfig.EditorConfig",
+    "PeterSchmalfeldt.explorer-exclude",
+    "mhutchie.git-graph",
+    "donjayamanne.githistory",
+    "shyykoserhiy.git-autoconfig",
+    "github.vscode-github-actions",
+    "GitHub.copilot",
+    "GitHub.copilot-chat",
+    "GitHub.vscode-pull-request-github",
+    "ms-vscode.live-server",
+    "spmeesseman.vscode-taskexplorer",
+    "tilt-dev.tiltfile",
+    "jock.svg",
+    "Gruntfuggly.todo-tree",
+    "shardulm94.trailing-spaces",
+    "XuangeAha.vsmarketplace-badges",
+    "redhat.vscode-yaml",
+    "aaron-bond.better-comments",
+    "GitHub.remotehub",
+    "ms-vscode.remote-repositories",
+    "usernamehw.errorlens",
+    "formulahendry.auto-rename-tag",
+    "cweijan.dbclient-jdbc",
+    "ms-vscode-remote.vscode-remote-extensionpack",
+    "VisualStudioExptTeam.vscodeintellicode",
+    "VisualStudioExptTeam.intellicode-api-usage-examples",
+    "eliostruyf.vscode-front-matter-beta",
+    "oderwat.indent-rainbow",
+    "DavidAnson.vscode-markdownlint",
+    "ms-edgedevtools.vscode-edge-devtools",
+    "formulahendry.code-runner",
+    "ms-windows-ai-studio.windows-ai-studio",
+    "IBM.output-colorizer",
+    "EverlastEngineering.debug-in-titlebar",
+    "DutchIgor.json-viewer",
+    "elagil.pre-commit-helper",
+    "ms-vscode.vscode-websearchforcopilot",
+    "GitHub.copilot-workspace",
+    "ms-azuretools.vscode-azure-github-copilot",
+    "ms-vscode.vscode-copilot-vision",
+    "ms-vscode.vscode-copilot-data-analysis",
+    "bierner.markdown-preview-github-styles",
+    "berublan.vscode-log-viewer",
+    "christian-kohler.path-intellisense",
+    "ms-vsliveshare.vsliveshare",
+    "bierner.github-markdown-preview",
+    "JeronimoEkerdt.color-picker-universal",
+    "howardzuo.vscode-git-tags",
+    "qcz.text-power-tools",
+    "timonwong.shellcheck",
+    "antfu.iconify",
+    "GrapeCity.gc-excelviewer",
+    "foxundermoon.shell-format",
+    "mindaro-dev.file-downloader",
+    "AutomataLabs.copilot-mcp",
+    "maciejdems.add-to-gitignore",
+    "vscode-icons-team.vscode-icons",
+    "ms-vscode.vscode-speech",
+    "wayou.vscode-todo-highlight",
+    "tomoki1207.pdf",
+    "adamraichu.docx-viewer",
+    "RandomFractalsInc.geo-data-viewer",
+    "VisualStudioExptTeam.vscodeintellicode-completions",
+    "moalamri.inline-fold",
+    "ritwickdey.LiveServer",
+    "BeardedBear.beardedtheme",
+    "genaiscript.genaiscript-vscode",
+    "docker.docker-vscode-extension",
+    "ms-toolsai.prompty",
+    "prompt-flow.prompt-flow",
+    "ms-vscode.vscode-commander",
+    "adautomendes.yaml2table-preview"
+  ]
+}
+
 module "github-upload-public-key" {
   count            = local.github_auth_enabled && data.coder_workspace.me.start_count > 0 ? data.coder_workspace.me.start_count : 0
   source           = "registry.coder.com/modules/github-upload-public-key/coder"
@@ -288,9 +377,9 @@ module "git-config" {
 module "cursor" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/modules/cursor/coder"
-
+  version  = "1.0.19"
   agent_id = coder_agent.dev.id
-  folder   = "/workspaces"
+  folder   = "/home/coder/projects"
 }
 
 module "git-clone" {
@@ -299,7 +388,7 @@ module "git-clone" {
 
   agent_id = coder_agent.dev.id
   url      = "https://github.com/coder/coder"
-  base_dir = "/workspaces"
+  base_dir = "~/projects"
 }
 
 module "coder-login" {
@@ -318,6 +407,8 @@ module "filebrowser" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/modules/filebrowser/coder"
   agent_id = coder_agent.dev.id
+  folder   = "~/projects"
+  subdomain  = false
 }
 
 module "git-commit-signing" {
