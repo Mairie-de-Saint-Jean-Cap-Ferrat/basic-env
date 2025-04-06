@@ -2,12 +2,14 @@ terraform {
   required_providers {
     coder = {
       source  = "coder/coder"
-      version = "0.21.0"
     }
 
     docker = {
       source  = "kreuzwerker/docker"
-      version = "3.0.2"
+    }
+
+    envbuilder = {
+      source = "coder/envbuilder"
     }
   }
 }
@@ -33,6 +35,10 @@ provider "docker" {
 }
 
 provider "coder" {}
+
+provider "envbuilder" {}
+
+data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
 
 resource "random_string" "vnc_password" {
@@ -103,10 +109,13 @@ if [ ! -z "$GIT_REPO" ]; then
   fi
 fi
 
+# Only start VNC if enabled
 if [ "$VNC_ENABLED" = "true" ]
 then
   echo "[+] Starting VNC"
-  echo "${random_string.vnc_password[0].result}" | tightvncpasswd -f > $HOME/.vnc/passwd
+  # Generate VNC password file
+  VNC_PWD='${data.coder_parameter.vnc.value == "true" ? random_string.vnc_password[0].result : ""}'
+  echo "$VNC_PWD" | tightvncpasswd -f > $HOME/.vnc/passwd
   supervisorctl start vnc:*
 fi
 EOT
@@ -115,10 +124,13 @@ EOT
 data "coder_parameter" "docker_image" {
   name        = "Docker Image"
   description = "Quelle image ?"
-  type        = "string"
-  default     = "base"
-  order       = 1
-  mutable     = true
+
+  type    = "string"
+  default = "base"
+
+  order = 1
+
+  mutable = true
 
   option {
     name  = "JavaScript"
@@ -145,6 +157,7 @@ data "coder_parameter" "docker_image" {
     value = "python"
   }
 
+
   option {
     name  = "Base"
     value = "base"
@@ -154,10 +167,13 @@ data "coder_parameter" "docker_image" {
 data "coder_parameter" "shell" {
   name        = "Shell"
   description = "Quel shell par défaut ?"
-  type        = "string"
-  default     = "bash"
-  order       = 2
-  mutable     = true
+
+  type    = "string"
+  default = "bash"
+
+  order = 2
+
+  mutable = true
 
   option {
     name  = "Bash"
@@ -168,7 +184,7 @@ data "coder_parameter" "shell" {
     name  = "ZSH"
     value = "zsh"
   }
-  
+
   option {
     name  = "sh"
     value = "sh"
@@ -178,19 +194,25 @@ data "coder_parameter" "shell" {
 data "coder_parameter" "vnc" {
   name        = "VNC"
   description = "Activer VNC?"
-  type        = "bool"
-  default     = "true"
-  order       = 3
-  mutable     = true
+
+  order = 3
+
+  type    = "bool"
+  default = "true"
+
+  mutable = true
 }
 
 data "coder_parameter" "vscode_binary" {
   name        = "VS Code Channel"
   description = "Quelle version de VS Code ?"
-  type        = "string"
-  default     = "code"
-  order       = 4
-  mutable     = true
+
+  type    = "string"
+  default = "code"
+
+  order = 4
+
+  mutable = true
 
   option {
     name  = "Stable"
@@ -217,18 +239,34 @@ data "coder_parameter" "git_repository" {
   }
 }
 
+data "coder_external_auth" "github" {
+  id = "myauthid"
+}
+
+module "github-upload-public-key" {
+  count            = data.coder_workspace.me.start_count
+  source           = "registry.coder.com/modules/github-upload-public-key/coder"
+  version          = "1.0.15"
+  agent_id         = coder_agent.dev.id
+  external_auth_id = data.coder_external_auth.github.id
+}
+
 module "dotfiles" {
   source   = "registry.coder.com/modules/dotfiles/coder"
-  version  = "1.0.14"
-  coder_parameter_order = 6
+  version  = "1.0.29"
+
+  coder_parameter_order = 5
+
   agent_id = coder_agent.dev.id
 }
 
 module "dotfiles-root" {
   source       = "registry.coder.com/modules/dotfiles/coder"
   version      = "1.0.14"
+
   user         = "root"
   dotfiles_uri = module.dotfiles.dotfiles_uri
+
   agent_id     = coder_agent.dev.id
 }
 
@@ -238,50 +276,97 @@ module "git-config" {
   
   allow_username_change = true
   allow_email_change = true
-  coder_parameter_order = 7
+
+  coder_parameter_order = 6
+
   agent_id = coder_agent.dev.id
+}
+
+module "cursor" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/modules/cursor/coder"
+  version  = "1.0.19"
+  agent_id = coder_agent.dev.id
+  folder   = "/workspaces"
+}
+
+module "git-clone" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/modules/git-clone/coder"
+  version  = "1.0.18"
+  agent_id = coder_agent.dev.id
+  url      = "https://github.com/coder/coder"
+  base_dir = "/workspaces"
 }
 
 module "coder-login" {
   source   = "registry.coder.com/modules/coder-login/coder"
   version  = "1.0.2"
+
   agent_id = coder_agent.dev.id
 }
 
 module "personalize" {
-  source = "registry.coder.com/modules/personalize/coder"
-  version = "1.0.2"
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/modules/personalize/coder"
+  version  = "1.0.2"
+  agent_id = coder_agent.dev.id
+}
+
+module "filebrowser" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/modules/filebrowser/coder"
+  version  = "1.0.30"
+  agent_id = coder_agent.dev.id
+}
+
+module "git-commit-signing" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/modules/git-commit-signing/coder"
+  version  = "1.0.11"
   agent_id = coder_agent.dev.id
 }
 
 resource "coder_app" "code-server" {
   agent_id = coder_agent.dev.id
+
   display_name = "VS Code Web"
   slug         = "code-server"
+
   order = 1
+
   url  = "http://localhost:8000/?folder=/home/coder/projects"
   icon = "/icon/code.svg"
+
   subdomain = local.enable_subdomains
 }
 
 resource "coder_app" "novnc" {
   count    = data.coder_parameter.vnc.value == "true" ? 1 : 0
   agent_id = coder_agent.dev.id
+
   display_name = "noVNC"
   slug         = "novnc"
+
   order = 2
+
   url  = "http://localhost:8081?autoconnect=1&resize=scale&path=@${data.coder_workspace.me.owner}/${data.coder_workspace.me.name}.dev/apps/noVNC/websockify&password=${random_string.vnc_password[0].result}"
   icon = "/icon/novnc.svg"
+
   subdomain = local.enable_subdomains
 }
 
 resource "coder_app" "supervisor" {
   agent_id = coder_agent.dev.id
+
   display_name = "Supervisor"
   slug         = "supervisor"
+
   order = 3
+
   url  = "http://localhost:8079"
   icon = "/icon/widgets.svg"
+
   subdomain = local.enable_subdomains
 }
 
@@ -312,6 +397,7 @@ resource "docker_volume" "home" {
 
 resource "coder_metadata" "home" {
   resource_id = docker_volume.home.id
+
   hide = true
 
   item {
@@ -322,73 +408,87 @@ resource "coder_metadata" "home" {
 
 data "docker_registry_image" "javascript" {
   count = data.coder_parameter.docker_image.value == "javascript" ? 1 : 0
+
   name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/javascript:latest"
 }
 
 resource "docker_image" "javascript" {
   count = data.coder_parameter.docker_image.value == "javascript" ? 1 : 0
+
   name          = data.docker_registry_image.javascript[0].name
   pull_triggers = [data.docker_registry_image.javascript[0].sha256_digest]
 }
 
 data "docker_registry_image" "typescript" {
   count = data.coder_parameter.docker_image.value == "typescript" ? 1 : 0
+
   name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/typescript:latest"
 }
 
 resource "docker_image" "typescript" {
   count = data.coder_parameter.docker_image.value == "typescript" ? 1 : 0
+
   name          = data.docker_registry_image.typescript[0].name
   pull_triggers = [data.docker_registry_image.typescript[0].sha256_digest]
 }
 
 data "docker_registry_image" "php" {
   count = data.coder_parameter.docker_image.value == "php" ? 1 : 0
+
   name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/php:latest"
 }
 
 resource "docker_image" "php" {
   count = data.coder_parameter.docker_image.value == "php" ? 1 : 0
+
   name          = data.docker_registry_image.php[0].name
   pull_triggers = [data.docker_registry_image.php[0].sha256_digest]
 }
 
 data "docker_registry_image" "java" {
   count = data.coder_parameter.docker_image.value == "java" ? 1 : 0
+
   name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/java:latest"
 }
 
 resource "docker_image" "java" {
   count = data.coder_parameter.docker_image.value == "java" ? 1 : 0
+
   name          = data.docker_registry_image.java[0].name
   pull_triggers = [data.docker_registry_image.java[0].sha256_digest]
 }
 
 data "docker_registry_image" "python" {
   count = data.coder_parameter.docker_image.value == "python" ? 1 : 0
+
   name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/python:latest"
 }
 
 resource "docker_image" "python" {
   count = data.coder_parameter.docker_image.value == "python" ? 1 : 0
+
   name          = data.docker_registry_image.python[0].name
   pull_triggers = [data.docker_registry_image.python[0].sha256_digest]
 }
 
 data "docker_registry_image" "base" {
   count = data.coder_parameter.docker_image.value == "base" ? 1 : 0
+
   name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest"
 }
 
 resource "docker_image" "base" {
   count = data.coder_parameter.docker_image.value == "base" ? 1 : 0
+
   name          = data.docker_registry_image.base[0].name
   pull_triggers = [data.docker_registry_image.base[0].sha256_digest]
 }
 
 resource "coder_metadata" "javascript_image" {
   count = data.coder_parameter.docker_image.value == "javascript" ? 1 : 0
+
   resource_id = docker_image.javascript[0].id
+
   hide = true
 
   item {
@@ -399,7 +499,9 @@ resource "coder_metadata" "javascript_image" {
 
 resource "coder_metadata" "typescript_image" {
   count = data.coder_parameter.docker_image.value == "typescript" ? 1 : 0
+
   resource_id = docker_image.typescript[0].id
+
   hide = true
 
   item {
@@ -410,7 +512,9 @@ resource "coder_metadata" "typescript_image" {
 
 resource "coder_metadata" "php_image" {
   count = data.coder_parameter.docker_image.value == "php" ? 1 : 0
+
   resource_id = docker_image.php[0].id
+
   hide = true
 
   item {
@@ -421,7 +525,9 @@ resource "coder_metadata" "php_image" {
 
 resource "coder_metadata" "java_image" {
   count = data.coder_parameter.docker_image.value == "java" ? 1 : 0
+
   resource_id = docker_image.java[0].id
+
   hide = true
 
   item {
@@ -432,7 +538,9 @@ resource "coder_metadata" "java_image" {
 
 resource "coder_metadata" "python_image" {
   count = data.coder_parameter.docker_image.value == "python" ? 1 : 0
+
   resource_id = docker_image.python[0].id
+
   hide = true
 
   item {
@@ -443,7 +551,9 @@ resource "coder_metadata" "python_image" {
 
 resource "coder_metadata" "base_image" {
   count = data.coder_parameter.docker_image.value == "base" ? 1 : 0
+
   resource_id = docker_image.base[0].id
+
   hide = true
 
   item {
@@ -459,20 +569,21 @@ resource "docker_container" "workspace" {
   # we need to access [0] because we define a count in the docker_image's definition
   image = local.images[data.coder_parameter.docker_image.value][0].image_id
 
-  # set runtime to use Sysbox to allow Docker in Docker
-  runtime = "sysbox-runc"
+  # Use privileged mode instead of sysbox-runc for Docker-in-Docker functionality
+  privileged = true
+  
   name     = "coder-${local.user_name}-${local.workspace_name}"
   hostname = local.workspace_name
 
   dns      = [
     "100.100.100.100",
     "192.168.0.70"
-  ]
+    ]
 
   entrypoint = ["sh", "-c", replace(coder_agent.dev.init_script, "127.0.0.1", "host.docker.internal")]
   env        = ["CODER_AGENT_TOKEN=${coder_agent.dev.token}"]
 
-  volumes {
+  volumes { 
     volume_name    = docker_volume.home.name
     container_path = "/home/coder/"
     read_only      = false
