@@ -126,50 +126,29 @@ fi
 # Only start VNC if enabled
 if [ "$VNC_ENABLED" = "true" ]
 then
-  echo "[+] Setting up VNC"
-  
+  echo "[+] Starting VNC"
   # Ensure VNC directory exists
   mkdir -p $HOME/.vnc
-  
-  # Kill any existing VNC sessions
-  vncserver -kill :1 >/dev/null 2>&1 || true
   
   # Generate VNC password file
   VNC_PWD='${data.coder_parameter.vnc.value == "true" ? random_string.vnc_password[0].result : ""}'
   echo "$VNC_PWD" | tightvncpasswd -f > $HOME/.vnc/passwd
   chmod 600 $HOME/.vnc/passwd
   
-  # Create or update VNC config
-  cat > $HOME/.vnc/xstartup <<EOF
-#!/bin/sh
-unset SESSION_MANAGER
-unset DBUS_SESSION_BUS_ADDRESS
-xrdb $HOME/.Xresources
-xsetroot -solid grey
-export XKL_XMODMAP_DISABLE=1
-/etc/X11/Xsession
-startxfce4 &
-EOF
+  # Kill any existing VNC sessions
+  vncserver -kill :1 >/dev/null 2>&1 || true
   
-  chmod +x $HOME/.vnc/xstartup
+  # Start VNC server with proper configuration
+  vncserver :1 -geometry 1920x1080 -depth 24 -localhost no >/dev/null 2>&1
   
-  # Start VNC server
-  echo "[+] Starting VNC server"
-  vncserver :1 -geometry 1920x1080 -depth 24 >/dev/null 2>&1
+  # Wait a moment for VNC server to initialize
+  sleep 2
   
-  # Start noVNC
-  echo "[+] Starting noVNC"
-  # Check if noVNC is at the default location
-  if [ -f /usr/share/novnc/utils/launch.sh ]; then
-    /usr/share/novnc/utils/launch.sh --vnc localhost:5901 --listen 6080 >/dev/null 2>&1 &
-  # Check alternative location
-  elif [ -f /usr/local/novnc/utils/launch.sh ]; then
-    /usr/local/novnc/utils/launch.sh --vnc localhost:5901 --listen 6080 >/dev/null 2>&1 &
-  else
-    echo "[!] noVNC not found at expected locations"
-  fi
+  # Start noVNC with proper configuration
+  /usr/share/novnc/utils/launch.sh --vnc localhost:5901 --listen 6080 --web /usr/share/novnc >/dev/null 2>&1 &
   
-  echo "[+] VNC setup complete - Password: $VNC_PWD"
+  echo "[+] VNC server started with password: $VNC_PWD"
+  echo "[+] Access via browser at: http://localhost:6080/vnc.html"
 fi
 EOT
 
@@ -434,7 +413,6 @@ module "vscode-web" {
     "ritwickdey.LiveServer",
     "BeardedBear.beardedtheme",
     "genaiscript.genaiscript-vscode",
-    "docker.docker-vscode-extension",
     "ms-toolsai.prompty",
     "prompt-flow.prompt-flow",
     "ms-vscode.vscode-commander",
