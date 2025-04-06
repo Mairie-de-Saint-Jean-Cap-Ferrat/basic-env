@@ -2,10 +2,12 @@ terraform {
   required_providers {
     coder = {
       source  = "coder/coder"
+      version = "0.11.0"  # Using an older version compatible with the modules
     }
 
     docker = {
       source  = "kreuzwerker/docker"
+      version = "3.0.2"  # Specify version to ensure consistency
     }
 
     envbuilder = {
@@ -18,7 +20,7 @@ locals {
   enable_subdomains = true
 
   workspace_name = lower(data.coder_workspace.me.name)
-  user_name = lower(data.coder_workspace.me.owner)
+  user_name = lower(data.coder_workspace_owner.me.name)
 
   images = {
     javascript = docker_image.javascript
@@ -40,6 +42,7 @@ provider "envbuilder" {}
 
 data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
+data "coder_workspace_owner" "me" {}
 
 resource "random_string" "vnc_password" {
   count   = data.coder_parameter.vnc.value == "true" ? 1 : 0
@@ -276,7 +279,7 @@ module "git-config" {
   
   allow_username_change = true
   allow_email_change = true
-
+  
   coder_parameter_order = 6
 
   agent_id = coder_agent.dev.id
@@ -302,7 +305,7 @@ module "git-clone" {
 module "coder-login" {
   source   = "registry.coder.com/modules/coder-login/coder"
   version  = "1.0.2"
-
+  
   agent_id = coder_agent.dev.id
 }
 
@@ -350,7 +353,7 @@ resource "coder_app" "novnc" {
 
   order = 2
 
-  url  = "http://localhost:8081?autoconnect=1&resize=scale&path=@${data.coder_workspace.me.owner}/${data.coder_workspace.me.name}.dev/apps/noVNC/websockify&password=${random_string.vnc_password[0].result}"
+  url  = "http://localhost:8081?autoconnect=1&resize=scale&path=@${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}.dev/apps/noVNC/websockify&password=${random_string.vnc_password[0].result}"
   icon = "/icon/novnc.svg"
 
   subdomain = local.enable_subdomains
@@ -386,7 +389,7 @@ resource "docker_volume" "home" {
 
   labels {
     label = "coder.owner_id"
-    value = data.coder_workspace.me.owner_id
+    value = data.coder_workspace_owner.me.id
   }
 
   labels {
@@ -602,7 +605,7 @@ resource "docker_container" "workspace" {
 
   labels {
     label = "coder.owner_id"
-    value = data.coder_workspace.me.owner_id
+    value = data.coder_workspace_owner.me.id
   }
 
   labels {
