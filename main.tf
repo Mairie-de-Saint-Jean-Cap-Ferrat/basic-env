@@ -822,7 +822,8 @@ locals {
 }
 
 resource "docker_container" "workspace" {
-  count = data.coder_workspace.me.start_count
+  # On ne crée le conteneur standard que si on n'utilise pas devcontainer
+  count = data.coder_workspace.me.start_count > 0 && data.coder_parameter.use_devcontainer.value != "true" ? 1 : 0
 
   # we need to define a relation table in locals because we can't simply access resources like this: docker_image["javascript"]
   # we need to access [0] because we define a count in the docker_image's definition
@@ -831,7 +832,7 @@ resource "docker_container" "workspace" {
   # Use privileged mode instead of sysbox-runc for Docker-in-Docker functionality
   privileged = true
   
-  name     = "coder-${local.user_name}-${local.workspace_name}"
+  name     = local.container_name
   hostname = local.workspace_name
 
   dns      = [
@@ -872,12 +873,10 @@ resource "docker_container" "workspace" {
 
 # Création d'un conteneur Docker pour le devcontainer
 resource "docker_container" "devcontainer" {
-  count = data.coder_parameter.use_devcontainer.value == "true" ? 1 : 0
+  count = data.coder_parameter.use_devcontainer.value == "true" ? data.coder_workspace.me.start_count : 0
 
   # Correction de la syntaxe de l'expression conditionnelle
-  image = (data.coder_parameter.use_devcontainer.value == "true") ? (
-    (var.cache_repo != "") ? "${var.cache_repo}/${local.container_name}:latest" : data.coder_parameter.fallback_image.value
-  ) : ""
+  image = (var.cache_repo != "") ? "${var.cache_repo}/${local.container_name}:latest" : data.coder_parameter.fallback_image.value
   
   name     = local.container_name
   hostname = local.workspace_name
