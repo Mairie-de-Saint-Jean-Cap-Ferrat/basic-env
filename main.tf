@@ -85,9 +85,9 @@ resource "coder_agent" "dev" {
     "VSCODE_BINARY" = data.coder_parameter.vscode_binary.value,
     "SUPERVISOR_DIR" = "/usr/share/basic-env/supervisor",
     "GIT_REPO"      = data.coder_parameter.git_repository.value,
-    "CODER_USER_TOKEN" = data.owner_session_token,
-    "GIT_USERNAME" = data.owner_name,
-    "GIT_EMAIL" = data.owner_email
+    "CODER_USER_TOKEN" = local.owner_session_token,
+    "GIT_USERNAME" = local.owner_name,
+    "GIT_EMAIL" = local.owner_email
   }
 
   startup_script = <<EOT
@@ -252,11 +252,11 @@ data "coder_parameter" "git_repository" {
 }
 
 module "github-upload-public-key" {
-  count            = data.github_auth_enabled && data.coder_workspace.me.start_count > 0 ? data.coder_workspace.me.start_count : 0
+  count            = local.github_auth_enabled && data.coder_workspace.me.start_count > 0 ? data.coder_workspace.me.start_count : 0
   source           = "registry.coder.com/modules/github-upload-public-key/coder"
 
   agent_id         = coder_agent.dev.id
-  external_auth_id = data.github_auth_enabled ? "myauthid" : ""
+  external_auth_id = local.github_auth_enabled ? "myauthid" : ""
 }
 
 module "dotfiles" {
