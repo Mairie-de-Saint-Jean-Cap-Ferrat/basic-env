@@ -83,11 +83,16 @@ resource "coder_agent" "dev" {
     "VNC_ENABLED"   = data.coder_parameter.vnc.value,
     "SHELL"         = data.coder_parameter.shell.value,
     "VSCODE_BINARY" = data.coder_parameter.vscode_binary.value,
-    "SUPERVISOR_DIR" = "/usr/share/basic-env/supervisor",
     "GIT_REPO"      = data.coder_parameter.git_repository.value,
     "CODER_USER_TOKEN" = local.owner_session_token,
     "GIT_USERNAME" = local.owner_name,
-    "GIT_EMAIL" = local.owner_email
+    "GIT_EMAIL" = local.owner_email,
+    
+    # Git configuration
+    "GIT_AUTHOR_NAME"     = local.owner_name
+    "GIT_AUTHOR_EMAIL"    = local.owner_email
+    "GIT_COMMITTER_NAME"  = local.owner_name
+    "GIT_COMMITTER_EMAIL" = local.owner_email
   }
 
   startup_script = <<EOT
@@ -97,11 +102,8 @@ SHELL=$(which $SHELL)
 sudo chsh -s $SHELL $USER
 sudo chsh -s $SHELL root
 
-# Start supervisord
-supervisord
-
 echo "[+] Starting code-server"
-supervisorctl start code-server
+code-server --auth none --port 13337 >/dev/null 2>&1 &
 
 # Clone Git repository if URL is provided
 if [ ! -z "$GIT_REPO" ]; then
@@ -128,9 +130,76 @@ then
   # Generate VNC password file
   VNC_PWD='${data.coder_parameter.vnc.value == "true" ? random_string.vnc_password[0].result : ""}'
   echo "$VNC_PWD" | tightvncpasswd -f > $HOME/.vnc/passwd
-  supervisorctl start vnc:*
+  
+  # Start VNC server directly
+  vncserver :1 -geometry 1920x1080 -depth 24 >/dev/null 2>&1
+  
+  # Start noVNC
+  /usr/share/novnc/utils/launch.sh --vnc localhost:5901 --listen 6080 >/dev/null 2>&1 &
 fi
 EOT
+
+  # Monitoring metadata blocks
+  metadata {
+    display_name = "CPU Usage"
+    key          = "0_cpu_usage"
+    script       = "coder stat cpu"
+    interval     = 10
+    timeout      = 1
+  }
+
+  metadata {
+    display_name = "RAM Usage"
+    key          = "1_ram_usage"
+    script       = "coder stat mem"
+    interval     = 10
+    timeout      = 1
+  }
+
+  metadata {
+    display_name = "Home Disk"
+    key          = "3_home_disk"
+    script       = "coder stat disk --path $HOME"
+    interval     = 60
+    timeout      = 1
+  }
+
+  metadata {
+    display_name = "CPU Usage (Host)"
+    key          = "4_cpu_usage_host"
+    script       = "coder stat cpu --host"
+    interval     = 10
+    timeout      = 1
+  }
+
+  metadata {
+    display_name = "Memory Usage (Host)"
+    key          = "5_mem_usage_host"
+    script       = "coder stat mem --host"
+    interval     = 10
+    timeout      = 1
+  }
+
+  metadata {
+    display_name = "Load Average (Host)"
+    key          = "6_load_host"
+    # get load avg scaled by number of cores
+    script   = <<EOT
+      echo "`cat /proc/loadavg | awk '{ print $1 }'` `nproc`" | awk '{ printf "%0.2f", $1/$2 }'
+    EOT
+    interval = 60
+    timeout  = 1
+  }
+
+  metadata {
+    display_name = "Swap Usage (Host)"
+    key          = "7_swap_host"
+    script       = <<EOT
+      free -b | awk '/^Swap/ { printf("%.1f/%.1f", $3/1024.0/1024.0/1024.0, $2/1024.0/1024.0/1024.0) }'
+    EOT
+    interval     = 10
+    timeout      = 1
+  }
 }
 
 data "coder_parameter" "docker_image" {
@@ -432,20 +501,7 @@ resource "coder_app" "novnc" {
   subdomain = local.enable_subdomains
 }
 
-resource "coder_app" "supervisor" {
-  agent_id = coder_agent.dev.id
-
-  display_name = "Supervisor"
-  slug         = "supervisor"
-
-  order = 2
-
-  # Mise à jour de l'URL pour utiliser le port standard de supervisord
-  url  = "http://localhost:9001"
-  icon = "/icon/widgets.svg"
-
-  subdomain = local.enable_subdomains
-}
+# La ressource coder_app "supervisor" est supprimée car les statistiques sont maintenant intégrées dans l'agent
 
 resource "docker_volume" "home" {
   name = "coder-${data.coder_workspace.me.id}-home"
