@@ -27,7 +27,6 @@ locals {
     java = docker_image.java
     python = docker_image.python
     base = docker_image.base
-    devcontainer = data.coder_parameter.use_devcontainer.value == "true" ? [docker_container.devcontainer[0]] : []
   }
   
   # Flag to control GitHub integration
@@ -38,12 +37,15 @@ locals {
   owner_email = data.coder_workspace_owner.me.email
   owner_session_token = data.coder_workspace_owner.me.session_token
   
+  # Indiquer si l'utilisateur a choisi d'utiliser un devcontainer
+  use_devcontainer = data.coder_parameter.environment_type.value == "devcontainer"
+  
   # EnvBuilder configuration
   container_name = "coder-${local.user_name}-${local.workspace_name}"
   devcontainer_builder_image = data.coder_parameter.devcontainer_builder.value
   git_author_name = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
   git_author_email = data.coder_workspace_owner.me.email
-  repo_url = data.coder_parameter.use_devcontainer.value == "true" ? data.coder_parameter.repo_url.value : ""
+  repo_url = local.use_devcontainer ? data.coder_parameter.repo_url.value : ""
   
   # The envbuilder provider requires a key-value map of environment variables
   envbuilder_env = {
@@ -57,6 +59,14 @@ locals {
     "ENVBUILDER_PUSH_IMAGE" : var.cache_repo == "" ? "" : "true",
     "ENVBUILDER_INSECURE" : "${var.insecure_cache_repo}",
   }
+  
+  # Calculer l'image de secours en fonction des choix utilisateur
+  fallback_image = local.use_devcontainer ? data.coder_parameter.fallback_image.value : null
+
+  # Convert the environment variables map to the format expected by the docker provider
+  docker_env = [
+    for k, v in local.envbuilder_env : "${k}=${v}"
+  ]
 }
 
 provider "docker" {
@@ -239,178 +249,10 @@ EOT
   }
 }
 
-data "coder_parameter" "docker_image" {
-  name        = "Image de développement"
-  description = "Choisissez l'environnement de développement adapté à votre projet"
-
-  type    = "string"
-  default = "base"
-
-  order = 1
-
-  mutable = true
-
-  option {
-    name  = "JavaScript"
-    value = "javascript"
-  }
-
-  option {
-    name  = "Typescript"
-    value = "typescript"
-  }
-
-  option {
-    name  = "PHP"
-    value = "php"
-  }
-
-  option {
-    name  = "Java"
-    value = "java"
-  }
-
-  option {
-    name  = "Python"
-    value = "python"
-  }
-
-  option {
-    name  = "Base (Environnement générique)"
-    value = "base"
-  }
-}
-
-data "coder_parameter" "git_repository" {
-  name        = "Dépôt Git"
-  description = "URL du dépôt Git à cloner automatiquement dans votre espace de travail"
-  type        = "string"
-  default     = ""
-  order       = 2
-  mutable     = true
-
-  validation {
-    regex = "^(|https?://|git@).*"
-    error = "Git doit être une URL valide commençant par http://, https:// ou git@, ou être vide"
-  }
-}
-
-data "coder_parameter" "vnc" {
-  name        = "Interface graphique (VNC)"
-  description = "Activer une interface bureau à distance via noVNC"
-
-  order = 3
-
-  type    = "bool"
-  default = "true"
-
-  mutable = true
-}
-
-data "coder_parameter" "shell" {
-  name        = "Shell préféré"
-  description = "Choisissez votre shell par défaut"
-
-  type    = "string"
-  default = "bash"
-
-  order = 4
-
-  mutable = true
-
-  option {
-    name  = "Bash"
-    value = "bash"
-  }
-  
-  option {
-    name  = "ZSH"
-    value = "zsh"
-  }
-
-  option {
-    name  = "sh"
-    value = "sh"
-  }
-}
-
-data "coder_parameter" "vscode_binary" {
-  name        = "Version VS Code"
-  description = "Choisissez entre la version stable ou la version Insiders de VS Code"
-
-  type    = "string"
-  default = "code"
-
-  order = 5
-
-  mutable = true
-
-  option {
-    name  = "Stable"
-    value = "code"
-  }
-
-  option {
-    name  = "Insiders"
-    value = "code-insiders"
-  }
-}
-
-data "coder_parameter" "use_devcontainer" {
-  name        = "Utiliser Devcontainer"
-  type        = "bool"
-  description = "Activer la construction d'un environnement à partir d'une configuration devcontainer.json"
-  mutable     = true
-  default     = "false"
-  order       = 10
-}
-
-data "coder_parameter" "repo_url" {
-  name        = "URL du dépôt avec devcontainer"
-  description = "URL du dépôt Git contenant une configuration devcontainer.json"
-  type        = "string"
-  mutable     = true
-  default     = ""
-  order       = 11
-
-  validation {
-    regex = "^(|https?://|git@).*"
-    error = "Doit être une URL Git valide commençant par http://, https:// ou git@"
-  }
-}
-
-data "coder_parameter" "fallback_image" {
-  name        = "Image de secours"
-  description = "Cette image sera utilisée si la construction du devcontainer échoue"
-  display_name = "Fallback Image"
-  mutable     = true
-  order       = 12
-  
-  # Utilise l'image choisie par l'utilisateur comme valeur par défaut
-  default     = data.coder_parameter.docker_image.value == "javascript" ? "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/javascript:latest" : (
-               data.coder_parameter.docker_image.value == "typescript" ? "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/typescript:latest" : (
-               data.coder_parameter.docker_image.value == "php" ? "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/php:latest" : (
-               data.coder_parameter.docker_image.value == "java" ? "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/java:latest" : (
-               data.coder_parameter.docker_image.value == "python" ? "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/python:latest" : 
-               "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest"))))
-}
-
-data "coder_parameter" "devcontainer_builder" {
-  name        = "Image de construction Devcontainer"
-  description = <<-EOF
-Image qui construira le devcontainer.
-Nous recommandons d'utiliser une version spécifique car le tag `:latest` peut changer.
-Trouvez la dernière version d'Envbuilder ici: https://github.com/coder/envbuilder/pkgs/container/envbuilder
-EOF
-  mutable     = true
-  default     = "ghcr.io/coder/envbuilder:latest"
-  order       = 13
-}
-
-# Cache variables for faster builds
+# Cache variables pour des builds plus rapides
 variable "cache_repo" {
   default     = ""
-  description = "(Optionnel) Utiliser un registre de conteneurs comme cache pour accélérer les builds"
+  description = "URL du registre Docker à utiliser comme cache pour accélérer les builds de devcontainer"
   type        = string
 }
 
@@ -422,9 +264,335 @@ variable "insecure_cache_repo" {
 
 variable "cache_repo_docker_config_path" {
   default     = ""
-  description = "(Optionnel) Chemin vers un fichier docker config.json contenant les identifiants pour le repo cache, si nécessaire"
+  description = "Chemin vers un fichier docker config.json contenant les identifiants pour le registre cache"
   sensitive   = true
   type        = string
+}
+
+# Paramètres organisés en sections logiques
+# 1. Choix du type d'environnement (standard ou devcontainer)
+data "coder_parameter" "environment_type" {
+  name        = "Type d'environnement"
+  description = "Choisissez entre un environnement prédéfini ou une configuration personnalisée via devcontainer"
+  type        = "string"
+  default     = "standard"
+  mutable     = true
+  order       = 1
+  
+  option {
+    name  = "Environnement prédéfini"
+    value = "standard"
+    icon  = "/icon/terminal.svg"
+  }
+  
+  option {
+    name  = "DevContainer personnalisé"
+    value = "devcontainer"
+    icon  = "/icon/docker.svg"
+  }
+}
+
+# 2. Options pour l'environnement standard
+data "coder_parameter" "docker_image" {
+  name        = "Image de développement"
+  description = "Choisissez l'environnement de développement adapté à votre projet. ${data.coder_parameter.environment_type.value != "standard" ? "(Uniquement applicable si 'Environnement prédéfini' est sélectionné)" : ""}"
+  type        = "string"
+  default     = "base"
+  mutable     = true
+  order       = 2
+
+  option {
+    name  = "JavaScript"
+    value = "javascript"
+    icon  = "/icon/javascript.svg"
+  }
+
+  option {
+    name  = "TypeScript"
+    value = "typescript"
+    icon  = "/icon/typescript.svg"
+  }
+
+  option {
+    name  = "PHP"
+    value = "php"
+    icon  = "/icon/php.svg"
+  }
+
+  option {
+    name  = "Java"
+    value = "java"
+    icon  = "/icon/java.svg"
+  }
+
+  option {
+    name  = "Python"
+    value = "python"
+    icon  = "/icon/python.svg"
+  }
+
+  option {
+    name  = "Base (Environnement générique)"
+    value = "base"
+    icon  = "/icon/terminal.svg"
+  }
+}
+
+# 3. Options pour l'environnement DevContainer
+data "coder_parameter" "repo_url" {
+  name        = "URL du dépôt avec devcontainer"
+  description = "URL du dépôt Git contenant une configuration devcontainer.json. ${data.coder_parameter.environment_type.value != "devcontainer" ? "(Uniquement applicable si 'DevContainer personnalisé' est sélectionné)" : ""}"
+  type        = "string"
+  mutable     = true
+  default     = ""
+  order       = 3
+
+  validation {
+    regex = "^(|https?://|git@).*"
+    error = "Doit être une URL Git valide commençant par http://, https:// ou git@"
+  }
+}
+
+data "coder_parameter" "fallback_image" {
+  name        = "Image de secours"
+  description = "Cette image sera utilisée si la construction du devcontainer échoue. ${data.coder_parameter.environment_type.value != "devcontainer" ? "(Uniquement applicable si 'DevContainer personnalisé' est sélectionné)" : ""}"
+  type        = "string"
+  mutable     = true
+  order       = 4
+  
+  # Utilise l'image de base comme valeur par défaut
+  default     = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest"
+
+  # Options prédéfinies pour faciliter la sélection
+  option {
+    name  = "JavaScript"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/javascript:latest"
+  }
+  
+  option {
+    name  = "TypeScript"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/typescript:latest"
+  }
+  
+  option {
+    name  = "PHP"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/php:latest"
+  }
+  
+  option {
+    name  = "Java"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/java:latest"
+  }
+  
+  option {
+    name  = "Python"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/python:latest"
+  }
+  
+  option {
+    name  = "Base"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest"
+  }
+}
+
+data "coder_parameter" "devcontainer_builder" {
+  name        = "Image de construction"
+  description = "Image qui construira le devcontainer (recommandation: utilisez une version spécifique). ${data.coder_parameter.environment_type.value != "devcontainer" ? "(Uniquement applicable si 'DevContainer personnalisé' est sélectionné)" : ""}"
+  mutable     = true
+  default     = "ghcr.io/coder/envbuilder:latest"
+  order       = 5
+  
+  # Options pour différentes versions
+  option {
+    name  = "Latest"
+    value = "ghcr.io/coder/envbuilder:latest"
+  }
+  
+  option {
+    name  = "v0.3.10"
+    value = "ghcr.io/coder/envbuilder:v0.3.10"
+  }
+}
+
+# 4. Options communes - Git
+data "coder_parameter" "git_repository" {
+  name        = "Dépôt Git à cloner"
+  description = "URL d'un dépôt Git à cloner automatiquement (différent du dépôt DevContainer)"
+  type        = "string"
+  default     = ""
+  order       = 6
+  mutable     = true
+  
+  validation {
+    regex = "^(|https?://|git@).*"
+    error = "Git doit être une URL valide commençant par http://, https:// ou git@, ou être vide"
+  }
+}
+
+# 5. Options d'interface utilisateur
+data "coder_parameter" "vnc" {
+  name        = "Interface graphique (VNC)"
+  description = "Activer une interface bureau à distance via noVNC"
+  type        = "bool"
+  default     = "true"
+  order       = 7
+  mutable     = true
+  icon        = "/icon/novnc.svg"
+}
+
+# 6. Options de personnalisation
+data "coder_parameter" "shell" {
+  name        = "Shell par défaut"
+  description = "Choisissez votre shell préféré"
+  type        = "string"
+  default     = "bash"
+  order       = 8
+  mutable     = true
+
+  option {
+    name  = "Bash"
+    value = "bash"
+    icon  = "/icon/bash.svg"
+  }
+  
+  option {
+    name  = "ZSH"
+    value = "zsh"
+    icon  = "/icon/zsh.svg"
+  }
+
+  option {
+    name  = "Sh"
+    value = "sh"
+    icon  = "/icon/shell.svg"
+  }
+}
+
+data "coder_parameter" "vscode_binary" {
+  name        = "Version VS Code"
+  description = "Choisissez entre la version stable ou Insiders de VS Code"
+  type        = "string"
+  default     = "code"
+  order       = 9
+  mutable     = true
+
+  option {
+    name  = "Stable"
+    value = "code"
+    icon  = "/icon/vscode.svg"
+  }
+
+  option {
+    name  = "Insiders"
+    value = "code-insiders"
+    icon  = "/icon/vscode-insiders.svg"
+  }
+}
+
+resource "docker_container" "workspace" {
+  # On ne crée le conteneur standard que si on n'utilise pas devcontainer
+  count = data.coder_workspace.me.start_count > 0 && !local.use_devcontainer ? 1 : 0
+
+  # we need to define a relation table in locals because we can't simply access resources like this: docker_image["javascript"]
+  # we need to access [0] because we define a count in the docker_image's definition
+  image = local.images[data.coder_parameter.docker_image.value][0].image_id
+
+  # Use privileged mode instead of sysbox-runc for Docker-in-Docker functionality
+  privileged = true
+  
+  name     = local.container_name
+  hostname = local.workspace_name
+
+  dns      = [
+    "100.100.100.100",
+    "1.1.1.1"
+    ]
+
+  entrypoint = ["sh", "-c", replace(coder_agent.dev.init_script, "127.0.0.1", "host.docker.internal")]
+  env        = ["CODER_AGENT_TOKEN=${coder_agent.dev.token}"]
+
+  volumes { 
+    volume_name    = docker_volume.home.name
+    container_path = "/home/coder/"
+    read_only      = false
+  }
+
+  host {
+    host = "host.docker.internal"
+    ip   = "host-gateway"
+  }
+
+  # Add labels in Docker to keep track of orphan resources.
+  labels {
+    label = "coder.owner"
+    value = local.user_name
+  }
+
+  labels {
+    label = "coder.owner_id"
+    value = data.coder_workspace_owner.me.id
+  }
+
+  labels {
+    label = "coder.workspace_id"
+    value = data.coder_workspace.me.id
+  }
+}
+
+# Création d'un conteneur Docker pour le devcontainer
+resource "docker_container" "devcontainer" {
+  count = local.use_devcontainer ? data.coder_workspace.me.start_count : 0
+
+  # Correction de la syntaxe de l'expression conditionnelle
+  image = (var.cache_repo != "") ? "${var.cache_repo}/${local.container_name}:latest" : data.coder_parameter.fallback_image.value
+  
+  name     = local.container_name
+  hostname = local.workspace_name
+  
+  # Active le mode privilégié pour permettre Docker-in-Docker
+  privileged = true
+  
+  # Configuration du script d'initialisation et du token d'agent
+  entrypoint = ["sh", "-c", replace(coder_agent.dev.init_script, "127.0.0.1", "host.docker.internal")]
+  env        = concat(
+    ["CODER_AGENT_TOKEN=${coder_agent.dev.token}"],
+    local.docker_env
+  )
+  
+  # Montage du volume home
+  volumes { 
+    volume_name    = docker_volume.home.name
+    container_path = "/home/coder/"
+    read_only      = false
+  }
+  
+  # Accès à l'hôte Docker pour Docker-in-Docker
+  host {
+    host = "host.docker.internal"
+    ip   = "host-gateway"
+  }
+  
+  # Configuration DNS
+  dns = [
+    "100.100.100.100",
+    "1.1.1.1"
+  ]
+  
+  # Étiquettes pour le suivi des ressources
+  labels {
+    label = "coder.owner"
+    value = local.user_name
+  }
+  
+  labels {
+    label = "coder.owner_id"
+    value = data.coder_workspace_owner.me.id
+  }
+  
+  labels {
+    label = "coder.workspace_id"
+    value = data.coder_workspace.me.id
+  }
 }
 
 module "vscode-web" {
@@ -725,7 +893,7 @@ resource "docker_image" "base" {
 }
 
 resource "docker_image" "devcontainer_builder_image" {
-  count        = data.coder_parameter.use_devcontainer.value == "true" ? 1 : 0
+  count        = local.use_devcontainer ? 1 : 0
   name         = data.coder_parameter.devcontainer_builder.value
   keep_locally = true
 }
@@ -812,117 +980,4 @@ resource "coder_metadata" "base_image" {
 data "local_sensitive_file" "cache_repo_dockerconfigjson" {
   count    = var.cache_repo_docker_config_path == "" ? 0 : 1
   filename = var.cache_repo_docker_config_path
-}
-
-# Convert the environment variables map to the format expected by the docker provider
-locals {
-  docker_env = [
-    for k, v in local.envbuilder_env : "${k}=${v}"
-  ]
-}
-
-resource "docker_container" "workspace" {
-  # On ne crée le conteneur standard que si on n'utilise pas devcontainer
-  count = data.coder_workspace.me.start_count > 0 && data.coder_parameter.use_devcontainer.value != "true" ? 1 : 0
-
-  # we need to define a relation table in locals because we can't simply access resources like this: docker_image["javascript"]
-  # we need to access [0] because we define a count in the docker_image's definition
-  image = local.images[data.coder_parameter.docker_image.value][0].image_id
-
-  # Use privileged mode instead of sysbox-runc for Docker-in-Docker functionality
-  privileged = true
-  
-  name     = local.container_name
-  hostname = local.workspace_name
-
-  dns      = [
-    "100.100.100.100",
-    "1.1.1.1"
-    ]
-
-  entrypoint = ["sh", "-c", replace(coder_agent.dev.init_script, "127.0.0.1", "host.docker.internal")]
-  env        = ["CODER_AGENT_TOKEN=${coder_agent.dev.token}"]
-
-  volumes { 
-    volume_name    = docker_volume.home.name
-    container_path = "/home/coder/"
-    read_only      = false
-  }
-
-  host {
-    host = "host.docker.internal"
-    ip   = "host-gateway"
-  }
-
-  # Add labels in Docker to keep track of orphan resources.
-  labels {
-    label = "coder.owner"
-    value = local.user_name
-  }
-
-  labels {
-    label = "coder.owner_id"
-    value = data.coder_workspace_owner.me.id
-  }
-
-  labels {
-    label = "coder.workspace_id"
-    value = data.coder_workspace.me.id
-  }
-}
-
-# Création d'un conteneur Docker pour le devcontainer
-resource "docker_container" "devcontainer" {
-  count = data.coder_parameter.use_devcontainer.value == "true" ? data.coder_workspace.me.start_count : 0
-
-  # Correction de la syntaxe de l'expression conditionnelle
-  image = (var.cache_repo != "") ? "${var.cache_repo}/${local.container_name}:latest" : data.coder_parameter.fallback_image.value
-  
-  name     = local.container_name
-  hostname = local.workspace_name
-  
-  # Active le mode privilégié pour permettre Docker-in-Docker
-  privileged = true
-  
-  # Configuration du script d'initialisation et du token d'agent
-  entrypoint = ["sh", "-c", replace(coder_agent.dev.init_script, "127.0.0.1", "host.docker.internal")]
-  env        = concat(
-    ["CODER_AGENT_TOKEN=${coder_agent.dev.token}"],
-    local.docker_env
-  )
-  
-  # Montage du volume home
-  volumes { 
-    volume_name    = docker_volume.home.name
-    container_path = "/home/coder/"
-    read_only      = false
-  }
-  
-  # Accès à l'hôte Docker pour Docker-in-Docker
-  host {
-    host = "host.docker.internal"
-    ip   = "host-gateway"
-  }
-  
-  # Configuration DNS
-  dns = [
-    "100.100.100.100",
-    "1.1.1.1"
-  ]
-  
-  # Étiquettes pour le suivi des ressources
-  labels {
-    label = "coder.owner"
-    value = local.user_name
-  }
-  
-  labels {
-    label = "coder.owner_id"
-    value = data.coder_workspace_owner.me.id
-  }
-  
-  labels {
-    label = "coder.workspace_id"
-    value = data.coder_workspace.me.id
-  }
 }
