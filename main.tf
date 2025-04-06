@@ -30,6 +30,9 @@ locals {
     python = docker_image.python
     base = docker_image.base
   }
+  
+  # Flag to control GitHub integration
+  github_auth_enabled = false
 }
 
 provider "docker" {
@@ -242,16 +245,12 @@ data "coder_parameter" "git_repository" {
   }
 }
 
-data "coder_external_auth" "github" {
-  id = "myauthid"
-}
-
 module "github-upload-public-key" {
-  count            = data.coder_workspace.me.start_count
+  count            = local.github_auth_enabled && data.coder_workspace.me.start_count > 0 ? data.coder_workspace.me.start_count : 0
   source           = "registry.coder.com/modules/github-upload-public-key/coder"
   version          = "1.0.15"
   agent_id         = coder_agent.dev.id
-  external_auth_id = data.coder_external_auth.github.id
+  external_auth_id = local.github_auth_enabled ? "myauthid" : ""
 }
 
 module "dotfiles" {
