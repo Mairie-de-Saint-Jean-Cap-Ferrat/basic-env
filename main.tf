@@ -2,7 +2,7 @@ terraform {
   required_providers {
     coder = {
       source  = "coder/coder"
-      version = "1.0.0"  # Using an fixed version compatible with the modules
+      version = "1.0.0"  # DO NOT CHANGE - Using an fixed version compatible with the modules
     }
 
     docker = {
