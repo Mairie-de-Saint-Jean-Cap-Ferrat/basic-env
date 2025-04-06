@@ -1,0 +1,1 @@
+Ce projet basic-env comporte une configuration terraform pour l'application Coder, et il sert à créer les elements necessaires à la pré-configuration, helper, afin de mettre en place un environnement de développement.

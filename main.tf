@@ -134,8 +134,8 @@ EOT
 }
 
 data "coder_parameter" "docker_image" {
-  name        = "Docker Image"
-  description = "Quelle image ?"
+  name        = "Image de développement"
+  description = "Choisissez l'environnement de développement adapté à votre projet"
 
   type    = "string"
   default = "base"
@@ -169,21 +169,46 @@ data "coder_parameter" "docker_image" {
     value = "python"
   }
 
-
   option {
-    name  = "Base"
+    name  = "Base (Environnement générique)"
     value = "base"
   }
 }
 
+data "coder_parameter" "git_repository" {
+  name        = "Dépôt Git"
+  description = "URL du dépôt Git à cloner automatiquement dans votre espace de travail"
+  type        = "string"
+  default     = ""
+  order       = 2
+  mutable     = true
+
+  validation {
+    regex = "^(|https?://|git@).*"
+    error = "Git doit être une URL valide commençant par http://, https:// ou git@, ou être vide"
+  }
+}
+
+data "coder_parameter" "vnc" {
+  name        = "Interface graphique (VNC)"
+  description = "Activer une interface bureau à distance via noVNC"
+
+  order = 3
+
+  type    = "bool"
+  default = "true"
+
+  mutable = true
+}
+
 data "coder_parameter" "shell" {
-  name        = "Shell"
-  description = "Quel shell par défaut ?"
+  name        = "Shell préféré"
+  description = "Choisissez votre shell par défaut"
 
   type    = "string"
   default = "bash"
 
-  order = 2
+  order = 4
 
   mutable = true
 
@@ -203,26 +228,14 @@ data "coder_parameter" "shell" {
   }
 }
 
-data "coder_parameter" "vnc" {
-  name        = "VNC"
-  description = "Activer VNC?"
-
-  order = 3
-
-  type    = "bool"
-  default = "true"
-
-  mutable = true
-}
-
 data "coder_parameter" "vscode_binary" {
-  name        = "VS Code Channel"
-  description = "Quelle version de VS Code ?"
+  name        = "Version VS Code"
+  description = "Choisissez entre la version stable ou la version Insiders de VS Code"
 
   type    = "string"
   default = "code"
 
-  order = 4
+  order = 5
 
   mutable = true
 
@@ -234,20 +247,6 @@ data "coder_parameter" "vscode_binary" {
   option {
     name  = "Insiders"
     value = "code-insiders"
-  }
-}
-
-data "coder_parameter" "git_repository" {
-  name        = "Git Repository"
-  description = "URL du dépôt Git à cloner"
-  type        = "string"
-  default     = ""
-  order       = 5
-  mutable     = true
-
-  validation {
-    regex = "^(|https?://|git@).*"
-    error = "Git doit être une URL valide commençant par http://, https:// ou git@, ou être vide"
   }
 }
 
@@ -417,20 +416,6 @@ module "git-commit-signing" {
   agent_id = coder_agent.dev.id
 }
 
-resource "coder_app" "code-server" {
-  agent_id = coder_agent.dev.id
-
-  display_name = "VS Code Web"
-  slug         = "code-server"
-
-  order = 1
-
-  url  = "http://localhost:8000/?folder=/home/coder/projects"
-  icon = "/icon/code.svg"
-
-  subdomain = local.enable_subdomains
-}
-
 resource "coder_app" "novnc" {
   count    = data.coder_parameter.vnc.value == "true" ? 1 : 0
   agent_id = coder_agent.dev.id
@@ -438,9 +423,10 @@ resource "coder_app" "novnc" {
   display_name = "noVNC"
   slug         = "novnc"
 
-  order = 2
+  order = 1
 
-  url  = "http://localhost:8081?autoconnect=1&resize=scale&path=@${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}.dev/apps/noVNC/websockify&password=${random_string.vnc_password[0].result}"
+  # Mise à jour de la configuration pour correspondre à celle intégrée dans les images
+  url  = "http://localhost:6080"
   icon = "/icon/novnc.svg"
 
   subdomain = local.enable_subdomains
@@ -452,9 +438,10 @@ resource "coder_app" "supervisor" {
   display_name = "Supervisor"
   slug         = "supervisor"
 
-  order = 3
+  order = 2
 
-  url  = "http://localhost:8079"
+  # Mise à jour de l'URL pour utiliser le port standard de supervisord
+  url  = "http://localhost:9001"
   icon = "/icon/widgets.svg"
 
   subdomain = local.enable_subdomains
