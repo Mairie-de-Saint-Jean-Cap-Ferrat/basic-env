@@ -27,6 +27,7 @@ locals {
     java = docker_image.java
     python = docker_image.python
     base = docker_image.base
+    devcontainer = data.coder_parameter.use_devcontainer.value == "true" ? [docker_container.devcontainer[0]] : []
   }
   
   # Flag to control GitHub integration
@@ -36,6 +37,26 @@ locals {
   owner_name = data.coder_workspace_owner.me.name
   owner_email = data.coder_workspace_owner.me.email
   owner_session_token = data.coder_workspace_owner.me.session_token
+  
+  # EnvBuilder configuration
+  container_name = "coder-${local.user_name}-${local.workspace_name}"
+  devcontainer_builder_image = data.coder_parameter.devcontainer_builder.value
+  git_author_name = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+  git_author_email = data.coder_workspace_owner.me.email
+  repo_url = data.coder_parameter.use_devcontainer.value == "true" ? data.coder_parameter.repo_url.value : ""
+  
+  # The envbuilder provider requires a key-value map of environment variables
+  envbuilder_env = {
+    "ENVBUILDER_GIT_URL" : local.repo_url,
+    "ENVBUILDER_CACHE_REPO" : var.cache_repo,
+    "CODER_AGENT_TOKEN" : coder_agent.dev.token,
+    "CODER_AGENT_URL" : replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
+    "ENVBUILDER_INIT_SCRIPT" : replace(coder_agent.dev.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
+    "ENVBUILDER_FALLBACK_IMAGE" : data.coder_parameter.fallback_image.value,
+    "ENVBUILDER_DOCKER_CONFIG_BASE64" : try(data.local_sensitive_file.cache_repo_dockerconfigjson[0].content_base64, ""),
+    "ENVBUILDER_PUSH_IMAGE" : var.cache_repo == "" ? "" : "true",
+    "ENVBUILDER_INSECURE" : "${var.insecure_cache_repo}",
+  }
 }
 
 provider "docker" {
@@ -44,7 +65,10 @@ provider "docker" {
 
 provider "coder" {}
 
-provider "envbuilder" {}
+provider "envbuilder" {
+  # Configuration du provider envbuilder
+  # Aucun paramètre obligatoire n'est requis pour ce provider
+}
 
 data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
@@ -80,13 +104,13 @@ resource "coder_agent" "dev" {
   }
 
   env = {
-    "VNC_ENABLED"   = data.coder_parameter.vnc.value,
-    "SHELL"         = data.coder_parameter.shell.value,
-    "VSCODE_BINARY" = data.coder_parameter.vscode_binary.value,
-    "GIT_REPO"      = data.coder_parameter.git_repository.value,
-    "CODER_USER_TOKEN" = local.owner_session_token,
-    "GIT_USERNAME" = local.owner_name,
-    "GIT_EMAIL" = local.owner_email,
+    "VNC_ENABLED"   = data.coder_parameter.vnc.value
+    "SHELL"         = data.coder_parameter.shell.value
+    "VSCODE_BINARY" = data.coder_parameter.vscode_binary.value
+    "GIT_REPO"      = data.coder_parameter.git_repository.value
+    "CODER_USER_TOKEN" = local.owner_session_token
+    "GIT_USERNAME" = local.owner_name
+    "GIT_EMAIL" = local.owner_email
     
     # Git configuration
     "GIT_AUTHOR_NAME"     = local.owner_name
@@ -330,6 +354,77 @@ data "coder_parameter" "vscode_binary" {
     name  = "Insiders"
     value = "code-insiders"
   }
+}
+
+data "coder_parameter" "use_devcontainer" {
+  name        = "Utiliser Devcontainer"
+  type        = "bool"
+  description = "Activer la construction d'un environnement à partir d'une configuration devcontainer.json"
+  mutable     = true
+  default     = "false"
+  order       = 10
+}
+
+data "coder_parameter" "repo_url" {
+  name        = "URL du dépôt avec devcontainer"
+  description = "URL du dépôt Git contenant une configuration devcontainer.json"
+  type        = "string"
+  mutable     = true
+  default     = ""
+  order       = 11
+
+  validation {
+    regex = "^(|https?://|git@).*"
+    error = "Doit être une URL Git valide commençant par http://, https:// ou git@"
+  }
+}
+
+data "coder_parameter" "fallback_image" {
+  name        = "Image de secours"
+  description = "Cette image sera utilisée si la construction du devcontainer échoue"
+  display_name = "Fallback Image"
+  mutable     = true
+  order       = 12
+  
+  # Utilise l'image choisie par l'utilisateur comme valeur par défaut
+  default     = data.coder_parameter.docker_image.value == "javascript" ? "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/javascript:latest" : (
+               data.coder_parameter.docker_image.value == "typescript" ? "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/typescript:latest" : (
+               data.coder_parameter.docker_image.value == "php" ? "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/php:latest" : (
+               data.coder_parameter.docker_image.value == "java" ? "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/java:latest" : (
+               data.coder_parameter.docker_image.value == "python" ? "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/python:latest" : 
+               "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest"))))
+}
+
+data "coder_parameter" "devcontainer_builder" {
+  name        = "Image de construction Devcontainer"
+  description = <<-EOF
+Image qui construira le devcontainer.
+Nous recommandons d'utiliser une version spécifique car le tag `:latest` peut changer.
+Trouvez la dernière version d'Envbuilder ici: https://github.com/coder/envbuilder/pkgs/container/envbuilder
+EOF
+  mutable     = true
+  default     = "ghcr.io/coder/envbuilder:latest"
+  order       = 13
+}
+
+# Cache variables for faster builds
+variable "cache_repo" {
+  default     = ""
+  description = "(Optionnel) Utiliser un registre de conteneurs comme cache pour accélérer les builds"
+  type        = string
+}
+
+variable "insecure_cache_repo" {
+  default     = false
+  description = "Activez cette option si votre registre de cache n'utilise pas HTTPS"
+  type        = bool
+}
+
+variable "cache_repo_docker_config_path" {
+  default     = ""
+  description = "(Optionnel) Chemin vers un fichier docker config.json contenant les identifiants pour le repo cache, si nécessaire"
+  sensitive   = true
+  type        = string
 }
 
 module "vscode-web" {
@@ -629,6 +724,12 @@ resource "docker_image" "base" {
   pull_triggers = [data.docker_registry_image.base[0].sha256_digest]
 }
 
+resource "docker_image" "devcontainer_builder_image" {
+  count        = data.coder_parameter.use_devcontainer.value == "true" ? 1 : 0
+  name         = data.coder_parameter.devcontainer_builder.value
+  keep_locally = true
+}
+
 resource "coder_metadata" "javascript_image" {
   count = data.coder_parameter.docker_image.value == "javascript" ? 1 : 0
 
@@ -707,6 +808,19 @@ resource "coder_metadata" "base_image" {
   }
 }
 
+# Cache repo config for Docker 
+data "local_sensitive_file" "cache_repo_dockerconfigjson" {
+  count    = var.cache_repo_docker_config_path == "" ? 0 : 1
+  filename = var.cache_repo_docker_config_path
+}
+
+# Convert the environment variables map to the format expected by the docker provider
+locals {
+  docker_env = [
+    for k, v in local.envbuilder_env : "${k}=${v}"
+  ]
+}
+
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
 
@@ -750,6 +864,64 @@ resource "docker_container" "workspace" {
     value = data.coder_workspace_owner.me.id
   }
 
+  labels {
+    label = "coder.workspace_id"
+    value = data.coder_workspace.me.id
+  }
+}
+
+# Création d'un conteneur Docker pour le devcontainer
+resource "docker_container" "devcontainer" {
+  count = data.coder_parameter.use_devcontainer.value == "true" ? 1 : 0
+
+  # Correction de la syntaxe de l'expression conditionnelle
+  image = (data.coder_parameter.use_devcontainer.value == "true") ? (
+    (var.cache_repo != "") ? "${var.cache_repo}/${local.container_name}:latest" : data.coder_parameter.fallback_image.value
+  ) : ""
+  
+  name     = local.container_name
+  hostname = local.workspace_name
+  
+  # Active le mode privilégié pour permettre Docker-in-Docker
+  privileged = true
+  
+  # Configuration du script d'initialisation et du token d'agent
+  entrypoint = ["sh", "-c", replace(coder_agent.dev.init_script, "127.0.0.1", "host.docker.internal")]
+  env        = concat(
+    ["CODER_AGENT_TOKEN=${coder_agent.dev.token}"],
+    local.docker_env
+  )
+  
+  # Montage du volume home
+  volumes { 
+    volume_name    = docker_volume.home.name
+    container_path = "/home/coder/"
+    read_only      = false
+  }
+  
+  # Accès à l'hôte Docker pour Docker-in-Docker
+  host {
+    host = "host.docker.internal"
+    ip   = "host-gateway"
+  }
+  
+  # Configuration DNS
+  dns = [
+    "100.100.100.100",
+    "1.1.1.1"
+  ]
+  
+  # Étiquettes pour le suivi des ressources
+  labels {
+    label = "coder.owner"
+    value = local.user_name
+  }
+  
+  labels {
+    label = "coder.owner_id"
+    value = data.coder_workspace_owner.me.id
+  }
+  
   labels {
     label = "coder.workspace_id"
     value = data.coder_workspace.me.id
