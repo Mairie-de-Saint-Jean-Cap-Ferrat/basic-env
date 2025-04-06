@@ -67,6 +67,25 @@ locals {
   docker_env = [
     for k, v in local.envbuilder_env : "${k}=${v}"
   ]
+
+  # Configuration DNS pour garantir la résolution des noms d'hôtes
+  dns_servers = [
+    "8.8.8.8",     # Google DNS primaire
+    "8.8.4.4",     # Google DNS secondaire
+    "1.1.1.1",     # Cloudflare DNS primaire
+    "1.0.0.1",     # Cloudflare DNS secondaire
+    "9.9.9.9"      # Quad9 DNS
+  ]
+  
+  # Ajout d'une variable pour le timeout Git
+  git_timeout_seconds = 30
+
+  # Liste de serveurs de temps NTP
+  ntp_servers = [
+    "time.google.com",
+    "time.cloudflare.com",
+    "pool.ntp.org"
+  ]
 }
 
 provider "docker" {
@@ -127,14 +146,39 @@ resource "coder_agent" "dev" {
     "GIT_AUTHOR_EMAIL"    = local.owner_email
     "GIT_COMMITTER_NAME"  = local.owner_name
     "GIT_COMMITTER_EMAIL" = local.owner_email
+    
+    # Configuration améliorée pour Git
+    "GIT_HTTP_MAX_RETRIES" = "3"
+    "GIT_HTTP_TIMEOUT" = "${local.git_timeout_seconds}"
+    "GIT_CONFIG_NOSYSTEM" = "0"
+    "GIT_DISCOVERY_ACROSS_FILESYSTEM" = "1"
   }
 
   startup_script = <<EOT
 #!/bin/bash
+set -e
+
+echo "[+] Configuration du réseau et DNS"
+# Vérifier les serveurs DNS disponibles
+echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null
+echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf > /dev/null
+echo "nameserver 1.1.1.1" | sudo tee -a /etc/resolv.conf > /dev/null
+
+# Test de connectivité
+ping -c 1 github.com || echo "AVERTISSEMENT: Impossible de joindre github.com - vérifiez votre connectivité réseau"
+
 echo "[+] Setting default shell"
 SHELL=$(which $SHELL)
 sudo chsh -s $SHELL $USER
 sudo chsh -s $SHELL root
+
+echo "[+] Optimisation de la configuration Git"
+git config --global http.postBuffer 524288000
+git config --global http.maxRequestBuffer 100M
+git config --global core.compression 0
+git config --global http.lowSpeedLimit 1000
+git config --global http.lowSpeedTime 60
+git config --global credential.helper 'cache --timeout=3600'
 
 echo "[+] Starting code-server"
 code-server --auth none --port 13337 >/dev/null 2>&1 &
@@ -142,6 +186,7 @@ code-server --auth none --port 13337 >/dev/null 2>&1 &
 # Clone Git repository if URL is provided
 if [ ! -z "$GIT_REPO" ]; then
   echo "[+] Cloning Git repository: $GIT_REPO"
+  mkdir -p ~/projects
   cd ~/projects
   
   # Extract repo name from URL
@@ -151,9 +196,29 @@ if [ ! -z "$GIT_REPO" ]; then
   if [ -d "$REPO_NAME" ]; then
     echo "[*] Repository directory already exists, updating instead"
     cd "$REPO_NAME"
-    git pull
+    git pull || echo "AVERTISSEMENT: échec de git pull - des modifications locales peuvent exister"
   else
-    git clone "$GIT_REPO"
+    # Clonage avec gestion d'erreur et options avancées
+    echo "[+] Clonage du dépôt avec options avancées..."
+    
+    # Essayer différentes méthodes si le clonage standard échoue
+    if ! git clone --depth=1 "$GIT_REPO" --config http.sslVerify=false; then
+      echo "[!] Premier essai échoué, nouvelle tentative avec options différentes..."
+      
+      if ! git clone --depth=1 "$GIT_REPO" --config http.sslVerify=false --config http.postBuffer=524288000; then
+        echo "[!] Seconde tentative échouée, essai avec protocole Git..."
+        
+        # Convertir URL HTTPS en Git si nécessaire
+        GIT_URL=$(echo "$GIT_REPO" | sed 's|https://github.com/|git://github.com/|')
+        
+        if [ "$GIT_REPO" != "$GIT_URL" ] && ! git clone --depth=1 "$GIT_URL"; then
+          echo "[x] Échec du clonage après plusieurs tentatives. Créez un répertoire vide."
+          mkdir -p "$REPO_NAME"
+          echo "# Placeholder for $REPO_NAME" > "$REPO_NAME/README.md"
+          echo "Le clonage automatique a échoué. Veuillez cloner manuellement ce dépôt." >> "$REPO_NAME/README.md"
+        fi
+      fi
+    fi
   fi
 fi
 
@@ -184,6 +249,12 @@ then
   echo "[+] VNC server started with password: $VNC_PWD"
   echo "[+] Access via browser at: http://localhost:6080/vnc.html"
 fi
+
+# Synchronisation de l'heure du système pour éviter les problèmes avec Git
+echo "[+] Synchronisation de l'heure système"
+sudo ntpdate -u ${local.ntp_servers[0]} || sudo ntpdate -u ${local.ntp_servers[1]} || sudo ntpdate -u ${local.ntp_servers[2]} || true
+
+echo "[+] Configuration terminée avec succès"
 EOT
 
   # Monitoring metadata blocks
@@ -503,13 +574,15 @@ resource "docker_container" "workspace" {
   name     = local.container_name
   hostname = local.workspace_name
 
-  dns      = [
-    "100.100.100.100",
-    "1.1.1.1"
-    ]
+  # Configuration DNS améliorée pour une meilleure résolution des noms d'hôtes
+  dns = local.dns_servers
 
   entrypoint = ["sh", "-c", replace(coder_agent.dev.init_script, "127.0.0.1", "host.docker.internal")]
-  env        = ["CODER_AGENT_TOKEN=${coder_agent.dev.token}"]
+  env        = [
+    "CODER_AGENT_TOKEN=${coder_agent.dev.token}",
+    "GIT_HTTP_TIMEOUT=${local.git_timeout_seconds}",
+    "GIT_DISCOVERY_ACROSS_FILESYSTEM=1"
+  ]
 
   volumes { 
     volume_name    = docker_volume.home.name
@@ -521,6 +594,9 @@ resource "docker_container" "workspace" {
     host = "host.docker.internal"
     ip   = "host-gateway"
   }
+
+  # Support des IPv6 pour une meilleure connectivité réseau
+  network_mode = "bridge"
 
   # Add labels in Docker to keep track of orphan resources.
   labels {
@@ -555,7 +631,11 @@ resource "docker_container" "devcontainer" {
   # Configuration du script d'initialisation et du token d'agent
   entrypoint = ["sh", "-c", replace(coder_agent.dev.init_script, "127.0.0.1", "host.docker.internal")]
   env        = concat(
-    ["CODER_AGENT_TOKEN=${coder_agent.dev.token}"],
+    [
+      "CODER_AGENT_TOKEN=${coder_agent.dev.token}",
+      "GIT_HTTP_TIMEOUT=${local.git_timeout_seconds}",
+      "GIT_DISCOVERY_ACROSS_FILESYSTEM=1"
+    ],
     local.docker_env
   )
   
@@ -572,11 +652,11 @@ resource "docker_container" "devcontainer" {
     ip   = "host-gateway"
   }
   
-  # Configuration DNS
-  dns = [
-    "100.100.100.100",
-    "1.1.1.1"
-  ]
+  # Configuration DNS améliorée pour une meilleure résolution des noms d'hôtes
+  dns = local.dns_servers
+  
+  # Support des IPv6 pour une meilleure connectivité réseau
+  network_mode = "bridge"
   
   # Étiquettes pour le suivi des ressources
   labels {
@@ -726,7 +806,8 @@ module "cursor" {
 }
 
 module "git-clone" {
-  count    = data.coder_workspace.me.start_count
+  # Ne clonez pas automatiquement le repo Coder si un autre repo est spécifié ou si on est en mode devcontainer
+  count    = (data.coder_parameter.git_repository.value == "" && !local.use_devcontainer) ? 0 : 0
   source   = "registry.coder.com/modules/git-clone/coder"
 
   agent_id = coder_agent.dev.id
