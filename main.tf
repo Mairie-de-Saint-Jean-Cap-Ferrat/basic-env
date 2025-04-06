@@ -2,12 +2,10 @@ terraform {
   required_providers {
     coder = {
       source  = "coder/coder"
-      version = "1.0.0"  # DO NOT CHANGE - Using an fixed version compatible with the modules
     }
 
     docker = {
       source  = "kreuzwerker/docker"
-      version = "3.0.2"  # Specify version to ensure consistency
     }
 
     envbuilder = {
@@ -87,9 +85,9 @@ resource "coder_agent" "dev" {
     "VSCODE_BINARY" = data.coder_parameter.vscode_binary.value,
     "SUPERVISOR_DIR" = "/usr/share/basic-env/supervisor",
     "GIT_REPO"      = data.coder_parameter.git_repository.value,
-    "CODER_USER_TOKEN" = local.owner_session_token,
-    "GIT_USERNAME" = local.owner_name,
-    "GIT_EMAIL" = local.owner_email
+    "CODER_USER_TOKEN" = data.owner_session_token,
+    "GIT_USERNAME" = data.owner_name,
+    "GIT_EMAIL" = data.owner_email
   }
 
   startup_script = <<EOT
@@ -254,16 +252,15 @@ data "coder_parameter" "git_repository" {
 }
 
 module "github-upload-public-key" {
-  count            = local.github_auth_enabled && data.coder_workspace.me.start_count > 0 ? data.coder_workspace.me.start_count : 0
+  count            = data.github_auth_enabled && data.coder_workspace.me.start_count > 0 ? data.coder_workspace.me.start_count : 0
   source           = "registry.coder.com/modules/github-upload-public-key/coder"
-  version          = "1.0.15"
+
   agent_id         = coder_agent.dev.id
-  external_auth_id = local.github_auth_enabled ? "myauthid" : ""
+  external_auth_id = data.github_auth_enabled ? "myauthid" : ""
 }
 
 module "dotfiles" {
   source   = "registry.coder.com/modules/dotfiles/coder"
-  version  = "1.0.29"
 
   coder_parameter_order = 5
 
@@ -272,7 +269,6 @@ module "dotfiles" {
 
 module "dotfiles-root" {
   source       = "registry.coder.com/modules/dotfiles/coder"
-  version      = "1.0.14"
 
   user         = "root"
   dotfiles_uri = module.dotfiles.dotfiles_uri
@@ -282,7 +278,6 @@ module "dotfiles-root" {
 
 module "git-config" {
   source = "registry.coder.com/modules/git-config/coder"
-  version = "2.0.1"  # Update to a newer version that uses non-deprecated attributes
   
   allow_username_change = true
   allow_email_change = true
@@ -293,7 +288,7 @@ module "git-config" {
 module "cursor" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/modules/cursor/coder"
-  version  = "1.0.19"
+
   agent_id = coder_agent.dev.id
   folder   = "/workspaces"
 }
@@ -301,7 +296,7 @@ module "cursor" {
 module "git-clone" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/modules/git-clone/coder"
-  version  = "1.0.18"
+
   agent_id = coder_agent.dev.id
   url      = "https://github.com/coder/coder"
   base_dir = "/workspaces"
@@ -309,7 +304,6 @@ module "git-clone" {
 
 module "coder-login" {
   source   = "registry.coder.com/modules/coder-login/coder"
-  version  = "2.0.1"  # Update to a newer version that uses non-deprecated attributes
   
   agent_id = coder_agent.dev.id
 }
@@ -317,21 +311,18 @@ module "coder-login" {
 module "personalize" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/modules/personalize/coder"
-  version  = "1.0.2"
   agent_id = coder_agent.dev.id
 }
 
 module "filebrowser" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/modules/filebrowser/coder"
-  version  = "1.0.30"
   agent_id = coder_agent.dev.id
 }
 
 module "git-commit-signing" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/modules/git-commit-signing/coder"
-  version  = "1.0.11"
   agent_id = coder_agent.dev.id
 }
 
@@ -585,7 +576,7 @@ resource "docker_container" "workspace" {
 
   dns      = [
     "100.100.100.100",
-    "192.168.0.70"
+    "1.1.1.1"
     ]
 
   entrypoint = ["sh", "-c", replace(coder_agent.dev.init_script, "127.0.0.1", "host.docker.internal")]
