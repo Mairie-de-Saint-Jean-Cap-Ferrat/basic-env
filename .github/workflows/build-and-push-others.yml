@@ -13,6 +13,6 @@ jobs:
     uses: mairie-de-saint-jean-cap-ferrat/basic-env/.github/workflows/_build-and-push.yml@main
     strategy:
       matrix:
-        image: [dart, java, javascript]
+        image: [dart, java, javascript, typescript, php, python]
     with:
       image: ${{ matrix.image }}

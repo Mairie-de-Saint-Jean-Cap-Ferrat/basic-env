@@ -326,7 +326,7 @@ resource "coder_metadata" "home" {
 data "docker_registry_image" "javascript" {
   count = data.coder_parameter.docker_image.value == "javascript" ? 1 : 0
 
-  name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/javascript-node:latest"
+  name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/javascript:latest"
 }
 
 resource "docker_image" "javascript" {
@@ -339,7 +339,7 @@ resource "docker_image" "javascript" {
 data "docker_registry_image" "typescript" {
   count = data.coder_parameter.docker_image.value == "typescript" ? 1 : 0
 
-  name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/typescript-node:latest"
+  name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/typescript:latest"
 }
 
 resource "docker_image" "typescript" {

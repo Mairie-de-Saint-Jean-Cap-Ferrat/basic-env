@@ -1,0 +1,10 @@
+{
+  "name": "mairie-de-saint-jean-cap-ferrat/basic-env - PHP",
+  "image": "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest",
+
+  "features": {
+    "ghcr.io/devcontainers/features/php:1": {}
+  },
+  
+  "remoteUser": "coder"
+}
