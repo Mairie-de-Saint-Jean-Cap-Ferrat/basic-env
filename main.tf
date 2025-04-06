@@ -274,12 +274,10 @@ module "dotfiles-root" {
 
 module "git-config" {
   source = "registry.coder.com/modules/git-config/coder"
-  version = "1.0.12"
+  version = "1.0.0"  # Using specific version for compatibility
   
   allow_username_change = true
   allow_email_change = true
-  
-  coder_parameter_order = 6
 
   agent_id = coder_agent.dev.id
 }
@@ -303,7 +301,7 @@ module "git-clone" {
 
 module "coder-login" {
   source   = "registry.coder.com/modules/coder-login/coder"
-  version  = "1.0.2"
+  version  = "1.0.0"  # Use specific version for compatibility
   
   agent_id = coder_agent.dev.id
 }
