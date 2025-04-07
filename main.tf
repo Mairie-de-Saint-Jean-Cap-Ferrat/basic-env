@@ -48,6 +48,83 @@ locals {
   git_author_email = data.coder_workspace_owner.me.email
   repo_url = data.coder_parameter.git_repository.value
   
+  # Extensions VS Code par catégorie
+  vscode_extensions = {
+    git = [
+      "mhutchie.git-graph",
+      "donjayamanne.githistory",
+      "shyykoserhiy.git-autoconfig",
+      "github.vscode-github-actions",
+      "GitHub.vscode-pull-request-github",
+      "GitHub.remotehub",
+      "howardzuo.vscode-git-tags",
+      "maciejdems.add-to-gitignore"
+    ],
+    github_copilot = [
+      "GitHub.copilot",
+      "GitHub.copilot-chat",
+      "ms-vscode.vscode-copilot-vision",
+      "ms-azuretools.vscode-azure-github-copilot",
+      "ms-vscode.vscode-copilot-data-analysis",
+      "GitHub.copilot-workspace",
+      "genaiscript.genaiscript-vscode",
+      "ms-toolsai.prompty",
+      "prompt-flow.prompt-flow"
+    ],
+    languages = [
+      "ms-azuretools.vscode-docker",
+      "redhat.vscode-yaml",
+      "timonwong.shellcheck",
+      "foxundermoon.shell-format"
+    ],
+    productivity = [
+      "aaron-bond.better-comments",
+      "usernamehw.errorlens",
+      "formulahendry.auto-rename-tag",
+      "oderwat.indent-rainbow",
+      "vscode-icons-team.vscode-icons",
+      "wayou.vscode-todo-highlight",
+      "christian-kohler.path-intellisense",
+      "EditorConfig.EditorConfig",
+      "Gruntfuggly.todo-tree",
+      "shardulm94.trailing-spaces"
+    ],
+    viewers = [
+      "GrapeCity.gc-excelviewer",
+      "tomoki1207.pdf",
+      "adamraichu.docx-viewer",
+      "RandomFractalsInc.geo-data-viewer",
+      "DutchIgor.json-viewer",
+      "berublan.vscode-log-viewer"
+    ],
+    collaboration = [
+      "ms-vsliveshare.vsliveshare",
+      "ms-vscode.remote-repositories",
+      "ms-vscode-remote.vscode-remote-extensionpack"
+    ],
+    intelligence = [
+      "VisualStudioExptTeam.vscodeintellicode",
+      "VisualStudioExptTeam.intellicode-api-usage-examples",
+      "VisualStudioExptTeam.vscodeintellicode-completions"
+    ],
+    server = [
+      "ms-vscode.live-server",
+      "ritwickdey.LiveServer"
+    ]
+  }
+  
+  # Récupération des extensions sélectionnées par l'utilisateur
+  selected_extensions = concat(
+    data.coder_parameter.vscode_extensions_git.value == "true" ? local.vscode_extensions.git : [],
+    data.coder_parameter.vscode_extensions_github_copilot.value == "true" ? local.vscode_extensions.github_copilot : [],
+    data.coder_parameter.vscode_extensions_languages.value == "true" ? local.vscode_extensions.languages : [],
+    data.coder_parameter.vscode_extensions_productivity.value == "true" ? local.vscode_extensions.productivity : [],
+    data.coder_parameter.vscode_extensions_viewers.value == "true" ? local.vscode_extensions.viewers : [],
+    data.coder_parameter.vscode_extensions_collaboration.value == "true" ? local.vscode_extensions.collaboration : [],
+    data.coder_parameter.vscode_extensions_intelligence.value == "true" ? local.vscode_extensions.intelligence : [],
+    data.coder_parameter.vscode_extensions_server.value == "true" ? local.vscode_extensions.server : []
+  )
+  
   # The envbuilder provider requires a key-value map of environment variables
   envbuilder_env = {
     "ENVBUILDER_GIT_URL" : local.repo_url,
@@ -583,6 +660,79 @@ data "coder_parameter" "vscode_binary" {
   }
 }
 
+# 7. Options pour les extensions VS Code
+data "coder_parameter" "vscode_extensions_git" {
+  name        = "Extensions Git"
+  description = "Activer les extensions Git pour VS Code"
+  type        = "bool"
+  default     = "true"
+  order       = 10
+  mutable     = true
+}
+
+data "coder_parameter" "vscode_extensions_github_copilot" {
+  name        = "Extensions GitHub Copilot"
+  description = "Activer les extensions GitHub Copilot pour VS Code"
+  type        = "bool"
+  default     = "true"
+  order       = 11
+  mutable     = true
+}
+
+data "coder_parameter" "vscode_extensions_languages" {
+  name        = "Extensions de Langages"
+  description = "Activer les extensions de langages pour VS Code"
+  type        = "bool"
+  default     = "true"
+  order       = 12
+  mutable     = true
+}
+
+data "coder_parameter" "vscode_extensions_productivity" {
+  name        = "Extensions de Productivité"
+  description = "Activer les extensions de productivité pour VS Code"
+  type        = "bool"
+  default     = "true"
+  order       = 13
+  mutable     = true
+}
+
+data "coder_parameter" "vscode_extensions_viewers" {
+  name        = "Extensions de Visionneuses"
+  description = "Activer les extensions de visionneuses pour VS Code"
+  type        = "bool"
+  default     = "true"
+  order       = 14
+  mutable     = true
+}
+
+data "coder_parameter" "vscode_extensions_collaboration" {
+  name        = "Extensions de Collaboration"
+  description = "Activer les extensions de collaboration pour VS Code"
+  type        = "bool"
+  default     = "true"
+  order       = 15
+  mutable     = true
+}
+
+data "coder_parameter" "vscode_extensions_intelligence" {
+  name        = "Extensions d'Intelligence"
+  description = "Activer les extensions d'intelligence pour VS Code"
+  type        = "bool"
+  default     = "true"
+  order       = 16
+  mutable     = true
+}
+
+data "coder_parameter" "vscode_extensions_server" {
+  name        = "Extensions de Serveur"
+  description = "Activer les extensions de serveur pour VS Code"
+  type        = "bool"
+  default     = "true"
+  order       = 17
+  mutable     = true
+}
+
 resource "docker_container" "workspace" {
   # On ne crée le conteneur standard que si on n'utilise pas devcontainer
   count = data.coder_workspace.me.start_count > 0 && !local.use_devcontainer ? 1 : 0
@@ -729,83 +879,7 @@ module "vscode-web" {
   folder = "~/projects"
   subdomain = false
   use_cached = true
-  extensions = [
-    "mads-hartmann.bash-ide-vscode",
-    "mikestead.dotenv",
-    "vivaxy.vscode-conventional-commits",
-    "ms-azuretools.vscode-docker",
-    "EditorConfig.EditorConfig",
-    "PeterSchmalfeldt.explorer-exclude",
-    "mhutchie.git-graph",
-    "donjayamanne.githistory",
-    "shyykoserhiy.git-autoconfig",
-    "github.vscode-github-actions",
-    "GitHub.copilot",
-    "GitHub.copilot-chat",
-    "GitHub.vscode-pull-request-github",
-    "ms-vscode.live-server",
-    "spmeesseman.vscode-taskexplorer",
-    "tilt-dev.tiltfile",
-    "jock.svg",
-    "Gruntfuggly.todo-tree",
-    "shardulm94.trailing-spaces",
-    "XuangeAha.vsmarketplace-badges",
-    "redhat.vscode-yaml",
-    "aaron-bond.better-comments",
-    "GitHub.remotehub",
-    "ms-vscode.remote-repositories",
-    "usernamehw.errorlens",
-    "formulahendry.auto-rename-tag",
-    "cweijan.dbclient-jdbc",
-    "ms-vscode-remote.vscode-remote-extensionpack",
-    "VisualStudioExptTeam.vscodeintellicode",
-    "VisualStudioExptTeam.intellicode-api-usage-examples",
-    "eliostruyf.vscode-front-matter-beta",
-    "oderwat.indent-rainbow",
-    "DavidAnson.vscode-markdownlint",
-    "ms-edgedevtools.vscode-edge-devtools",
-    "formulahendry.code-runner",
-    "ms-windows-ai-studio.windows-ai-studio",
-    "IBM.output-colorizer",
-    "EverlastEngineering.debug-in-titlebar",
-    "DutchIgor.json-viewer",
-    "elagil.pre-commit-helper",
-    "ms-vscode.vscode-websearchforcopilot",
-    "GitHub.copilot-workspace",
-    "ms-azuretools.vscode-azure-github-copilot",
-    "ms-vscode.vscode-copilot-vision",
-    "ms-vscode.vscode-copilot-data-analysis",
-    "bierner.markdown-preview-github-styles",
-    "berublan.vscode-log-viewer",
-    "christian-kohler.path-intellisense",
-    "ms-vsliveshare.vsliveshare",
-    "bierner.github-markdown-preview",
-    "JeronimoEkerdt.color-picker-universal",
-    "howardzuo.vscode-git-tags",
-    "qcz.text-power-tools",
-    "timonwong.shellcheck",
-    "antfu.iconify",
-    "GrapeCity.gc-excelviewer",
-    "foxundermoon.shell-format",
-    "mindaro-dev.file-downloader",
-    "AutomataLabs.copilot-mcp",
-    "maciejdems.add-to-gitignore",
-    "vscode-icons-team.vscode-icons",
-    "ms-vscode.vscode-speech",
-    "wayou.vscode-todo-highlight",
-    "tomoki1207.pdf",
-    "adamraichu.docx-viewer",
-    "RandomFractalsInc.geo-data-viewer",
-    "VisualStudioExptTeam.vscodeintellicode-completions",
-    "moalamri.inline-fold",
-    "ritwickdey.LiveServer",
-    "BeardedBear.beardedtheme",
-    "genaiscript.genaiscript-vscode",
-    "ms-toolsai.prompty",
-    "prompt-flow.prompt-flow",
-    "ms-vscode.vscode-commander",
-    "adautomendes.yaml2table-preview"
-  ]
+  extensions = local.selected_extensions
 }
 
 module "github-upload-public-key" {
