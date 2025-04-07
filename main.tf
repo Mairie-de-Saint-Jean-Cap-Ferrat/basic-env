@@ -58,6 +58,13 @@ locals {
     "ENVBUILDER_DOCKER_CONFIG_BASE64" : try(data.local_sensitive_file.cache_repo_dockerconfigjson[0].content_base64, ""),
     "ENVBUILDER_PUSH_IMAGE" : var.cache_repo == "" ? "" : "true",
     "ENVBUILDER_INSECURE" : "${var.insecure_cache_repo}",
+    "ENVBUILDER_QUICK_START" : "true",                 # Activer le démarrage rapide
+    "ENVBUILDER_SKIP_HEALTHCHECK" : "true",            # Ignorer le healthcheck pour accélérer
+    "ENVBUILDER_PARALLEL_PULL" : "true",               # Téléchargements parallèles
+    "ENVBUILDER_NO_PROGRESS" : "true",                 # Désactiver l'affichage verbeux
+    "DOCKER_BUILDKIT" : "1",                           # Activer BuildKit
+    "BUILDKIT_PROGRESS" : "plain",                     # Affichage plus simple
+    "DOCKER_CLI_EXPERIMENTAL" : "enabled"              # Activer les fonctionnalités expérimentales
   }
   
   # Calculer l'image de secours en fonction des choix utilisateur
@@ -86,6 +93,14 @@ locals {
     "time.cloudflare.com",
     "pool.ntp.org"
   ]
+
+  # Paramètres d'optimisation
+  docker_pull_timeout = 300
+  build_optimization = {
+    use_cache = true
+    parallel_downloads = true
+    keep_layers = true
+  }
 }
 
 provider "docker" {
@@ -179,11 +194,38 @@ git config --global core.compression 0
 git config --global http.lowSpeedLimit 1000
 git config --global http.lowSpeedTime 60
 git config --global credential.helper 'cache --timeout=3600'
+git config --global http.sslVerify false
 
 echo "[+] Starting code-server"
 code-server --auth none --port 13337 >/dev/null 2>&1 &
 
-# Clone Git repository if URL is provided
+# En mode devcontainer, on vérifie si le repo n'a pas déjà été cloné par envbuilder
+if [ ! -z "$DEVCONTAINER_GITHUB_URL" ]; then
+  echo "[+] Devcontainer: vérification du dépôt $DEVCONTAINER_GITHUB_URL"
+  
+  # Extraction du nom du dépôt depuis l'URL
+  REPO_NAME=$(basename "$DEVCONTAINER_GITHUB_URL" .git)
+  
+  # Si le répertoire n'existe pas déjà, on clone le dépôt
+  if [ ! -d "$HOME/projects/$REPO_NAME" ]; then
+    echo "[+] Clonage du dépôt devcontainer dans ~/projects/$REPO_NAME"
+    mkdir -p $HOME/projects
+    cd $HOME/projects
+    
+    # Clonage avec gestion avancée des erreurs
+    GIT_TERMINAL_PROMPT=0 git clone --depth=1 "$DEVCONTAINER_GITHUB_URL" \
+      --config http.sslVerify=false \
+      --config http.postBuffer=524288000 \
+      --config core.compression=0 \
+      --config http.lowSpeedLimit=1000 \
+      --config http.lowSpeedTime=60 \
+      || echo "[!] Échec du clonage automatique du dépôt devcontainer"
+  else
+    echo "[*] Le répertoire du dépôt devcontainer existe déjà"
+  fi
+fi
+
+# Clone Git repository if URL is provided (dépôt supplémentaire)
 if [ ! -z "$GIT_REPO" ]; then
   echo "[+] Cloning Git repository: $GIT_REPO"
   mkdir -p ~/projects
@@ -202,16 +244,16 @@ if [ ! -z "$GIT_REPO" ]; then
     echo "[+] Clonage du dépôt avec options avancées..."
     
     # Essayer différentes méthodes si le clonage standard échoue
-    if ! git clone --depth=1 "$GIT_REPO" --config http.sslVerify=false; then
+    if ! GIT_TERMINAL_PROMPT=0 git clone --depth=1 "$GIT_REPO" --config http.sslVerify=false; then
       echo "[!] Premier essai échoué, nouvelle tentative avec options différentes..."
       
-      if ! git clone --depth=1 "$GIT_REPO" --config http.sslVerify=false --config http.postBuffer=524288000; then
+      if ! GIT_TERMINAL_PROMPT=0 git clone --depth=1 "$GIT_REPO" --config http.sslVerify=false --config http.postBuffer=524288000; then
         echo "[!] Seconde tentative échouée, essai avec protocole Git..."
         
         # Convertir URL HTTPS en Git si nécessaire
         GIT_URL=$(echo "$GIT_REPO" | sed 's|https://github.com/|git://github.com/|')
         
-        if [ "$GIT_REPO" != "$GIT_URL" ] && ! git clone --depth=1 "$GIT_URL"; then
+        if [ "$GIT_REPO" != "$GIT_URL" ] && ! GIT_TERMINAL_PROMPT=0 git clone --depth=1 "$GIT_URL"; then
           echo "[x] Échec du clonage après plusieurs tentatives. Créez un répertoire vide."
           mkdir -p "$REPO_NAME"
           echo "# Placeholder for $REPO_NAME" > "$REPO_NAME/README.md"
@@ -253,6 +295,21 @@ fi
 # Synchronisation de l'heure du système pour éviter les problèmes avec Git
 echo "[+] Synchronisation de l'heure système"
 sudo ntpdate -u ${local.ntp_servers[0]} || sudo ntpdate -u ${local.ntp_servers[1]} || sudo ntpdate -u ${local.ntp_servers[2]} || true
+
+# Création d'un fichier de statut pour le monitoring
+mkdir -p $HOME/.coder
+cat > $HOME/.coder/status.json <<EOF
+{
+  "workspace": {
+    "name": "${local.workspace_name}",
+    "owner": "${local.user_name}",
+    "created_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "image": "${data.coder_parameter.environment_type.value == "devcontainer" ? "devcontainer" : data.coder_parameter.docker_image.value}",
+    "devcontainer_repo": "${data.coder_parameter.repo_url.value}",
+    "git_repo": "${data.coder_parameter.git_repository.value}"
+  }
+}
+EOF
 
 echo "[+] Configuration terminée avec succès"
 EOT
@@ -411,8 +468,8 @@ data "coder_parameter" "docker_image" {
 
 # 3. Options pour l'environnement DevContainer
 data "coder_parameter" "repo_url" {
-  name        = "URL du dépôt avec devcontainer"
-  description = "URL du dépôt Git contenant une configuration devcontainer.json. ${data.coder_parameter.environment_type.value != "devcontainer" ? "(Uniquement applicable si 'DevContainer personnalisé' est sélectionné)" : ""}"
+  name        = "URL du dépôt devcontainer"
+  description = data.coder_parameter.environment_type.value == "devcontainer" ? "URL du dépôt Git contenant une configuration devcontainer.json à utiliser pour construire l'environnement personnalisé" : "URL du dépôt Git avec devcontainer.json (applicable uniquement si 'DevContainer personnalisé' est sélectionné)"
   type        = "string"
   mutable     = true
   default     = ""
@@ -619,7 +676,7 @@ resource "docker_container" "workspace" {
 resource "docker_container" "devcontainer" {
   count = local.use_devcontainer ? data.coder_workspace.me.start_count : 0
 
-  # Correction de la syntaxe de l'expression conditionnelle
+  # Utiliser l'image en cache si disponible, sinon utiliser l'image de secours
   image = (var.cache_repo != "") ? "${var.cache_repo}/${local.container_name}:latest" : data.coder_parameter.fallback_image.value
   
   name     = local.container_name
@@ -628,13 +685,19 @@ resource "docker_container" "devcontainer" {
   # Active le mode privilégié pour permettre Docker-in-Docker
   privileged = true
   
+  # Amélioration de la gestion des timeouts et des options réseau
+  network_mode = "bridge"
+  restart = "on-failure"
+  
   # Configuration du script d'initialisation et du token d'agent
   entrypoint = ["sh", "-c", replace(coder_agent.dev.init_script, "127.0.0.1", "host.docker.internal")]
   env        = concat(
     [
       "CODER_AGENT_TOKEN=${coder_agent.dev.token}",
       "GIT_HTTP_TIMEOUT=${local.git_timeout_seconds}",
-      "GIT_DISCOVERY_ACROSS_FILESYSTEM=1"
+      "GIT_DISCOVERY_ACROSS_FILESYSTEM=1",
+      "DEVCONTAINER_GITHUB_URL=${data.coder_parameter.repo_url.value}", # URL du dépôt automatiquement transmise
+      "BUILD_START_TIME=${timestamp()}" # Pour suivre le temps de construction
     ],
     local.docker_env
   )
@@ -646,17 +709,28 @@ resource "docker_container" "devcontainer" {
     read_only      = false
   }
   
+  # Montage du socket Docker pour Docker-in-Docker plus rapide
+  volumes {
+    host_path      = "/var/run/docker.sock"
+    container_path = "/var/run/docker.sock"
+    read_only      = false
+  }
+  
+  # Montage d'un volume pour le cache Docker pour accélérer les builds
+  volumes {
+    container_path = "/var/lib/docker"
+    volume_name    = "${local.container_name}-docker-cache"
+    read_only      = false
+  }
+  
   # Accès à l'hôte Docker pour Docker-in-Docker
   host {
     host = "host.docker.internal"
     ip   = "host-gateway"
   }
   
-  # Configuration DNS améliorée pour une meilleure résolution des noms d'hôtes
+  # Configuration DNS optimisée
   dns = local.dns_servers
-  
-  # Support des IPv6 pour une meilleure connectivité réseau
-  network_mode = "bridge"
   
   # Étiquettes pour le suivi des ressources
   labels {
@@ -672,6 +746,11 @@ resource "docker_container" "devcontainer" {
   labels {
     label = "coder.workspace_id"
     value = data.coder_workspace.me.id
+  }
+  
+  labels {
+    label = "devcontainer.repository_url"
+    value = data.coder_parameter.repo_url.value
   }
 }
 
@@ -906,6 +985,9 @@ resource "docker_image" "javascript" {
 
   name          = data.docker_registry_image.javascript[0].name
   pull_triggers = [data.docker_registry_image.javascript[0].sha256_digest]
+  
+  # Amélioration de la vitesse de téléchargement
+  keep_locally = true
 }
 
 data "docker_registry_image" "typescript" {
@@ -919,6 +1001,9 @@ resource "docker_image" "typescript" {
 
   name          = data.docker_registry_image.typescript[0].name
   pull_triggers = [data.docker_registry_image.typescript[0].sha256_digest]
+  
+  # Optimisations pour accélérer le téléchargement et le build
+  keep_locally = true
 }
 
 data "docker_registry_image" "php" {
@@ -932,6 +1017,9 @@ resource "docker_image" "php" {
 
   name          = data.docker_registry_image.php[0].name
   pull_triggers = [data.docker_registry_image.php[0].sha256_digest]
+  
+  # Optimisations pour accélérer le téléchargement et le build
+  keep_locally = true
 }
 
 data "docker_registry_image" "java" {
@@ -945,6 +1033,9 @@ resource "docker_image" "java" {
 
   name          = data.docker_registry_image.java[0].name
   pull_triggers = [data.docker_registry_image.java[0].sha256_digest]
+  
+  # Optimisations pour accélérer le téléchargement et le build
+  keep_locally = true
 }
 
 data "docker_registry_image" "python" {
@@ -958,6 +1049,9 @@ resource "docker_image" "python" {
 
   name          = data.docker_registry_image.python[0].name
   pull_triggers = [data.docker_registry_image.python[0].sha256_digest]
+  
+  # Optimisations pour accélérer le téléchargement et le build
+  keep_locally = true
 }
 
 data "docker_registry_image" "base" {
@@ -971,6 +1065,9 @@ resource "docker_image" "base" {
 
   name          = data.docker_registry_image.base[0].name
   pull_triggers = [data.docker_registry_image.base[0].sha256_digest]
+  
+  # Optimisations pour accélérer le téléchargement et le build
+  keep_locally = true
 }
 
 resource "docker_image" "devcontainer_builder_image" {
