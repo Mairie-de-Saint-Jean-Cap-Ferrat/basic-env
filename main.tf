@@ -26,6 +26,7 @@ locals {
     php = docker_image.php
     java = docker_image.java
     python = docker_image.python
+    dart = docker_image.dart
     base = docker_image.base
   }
   
@@ -443,6 +444,12 @@ data "coder_parameter" "docker_image" {
   }
 
   option {
+    name  = "Dart"
+    value = "dart"
+    icon  = "/icon/dart.svg"
+  }
+
+  option {
     name  = "Base (Environnement générique)"
     value = "base"
     icon  = "/icon/terminal.svg"
@@ -484,6 +491,11 @@ data "coder_parameter" "fallback_image" {
   option {
     name  = "Python"
     value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/python:latest"
+  }
+  
+  option {
+    name  = "Dart"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/dart:latest"
   }
   
   option {
@@ -1008,6 +1020,21 @@ resource "docker_image" "python" {
   keep_locally = true
 }
 
+data "docker_registry_image" "dart" {
+  count = data.coder_parameter.docker_image.value == "dart" ? 1 : 0
+  name = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/dart:latest"
+}
+
+resource "docker_image" "dart" {
+  count = data.coder_parameter.docker_image.value == "dart" ? 1 : 0
+
+  name          = data.docker_registry_image.dart[0].name
+  pull_triggers = [data.docker_registry_image.dart[0].sha256_digest]
+  
+  # Optimisations pour accélérer le téléchargement et le build
+  keep_locally = true
+}
+
 data "docker_registry_image" "base" {
   count = data.coder_parameter.docker_image.value == "base" ? 1 : 0
 
@@ -1092,6 +1119,19 @@ resource "coder_metadata" "python_image" {
   item {
     key   = "description"
     value = "Python container image"
+  }
+}
+
+resource "coder_metadata" "dart_image" {
+  count = data.coder_parameter.docker_image.value == "dart" ? 1 : 0
+
+  resource_id = docker_image.dart[0].id
+
+  hide = true
+
+  item {
+    key   = "description"
+    value = "Dart container image"
   }
 }
 
