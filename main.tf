@@ -37,15 +37,15 @@ locals {
   owner_email = data.coder_workspace_owner.me.email
   owner_session_token = data.coder_workspace_owner.me.session_token
   
-  # Indiquer si l'utilisateur a choisi d'utiliser un devcontainer
-  use_devcontainer = data.coder_parameter.environment_type.value == "devcontainer"
+  # Utilisation de devcontainer selon le choix utilisateur
+  use_devcontainer = data.coder_parameter.use_devcontainer.value == "true"
   
   # EnvBuilder configuration
   container_name = "coder-${local.user_name}-${local.workspace_name}"
   devcontainer_builder_image = data.coder_parameter.devcontainer_builder.value
   git_author_name = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
   git_author_email = data.coder_workspace_owner.me.email
-  repo_url = local.use_devcontainer ? data.coder_parameter.repo_url.value : ""
+  repo_url = data.coder_parameter.git_repository.value
   
   # The envbuilder provider requires a key-value map of environment variables
   envbuilder_env = {
@@ -80,8 +80,7 @@ locals {
     "8.8.8.8",     # Google DNS primaire
     "8.8.4.4",     # Google DNS secondaire
     "1.1.1.1",     # Cloudflare DNS primaire
-    "1.0.0.1",     # Cloudflare DNS secondaire
-    "9.9.9.9"      # Quad9 DNS
+    "1.0.0.1"      # Cloudflare DNS secondaire
   ]
   
   # Ajout d'une variable pour le timeout Git
@@ -199,66 +198,47 @@ git config --global http.sslVerify false
 echo "[+] Starting code-server"
 code-server --auth none --port 13337 >/dev/null 2>&1 &
 
-# En mode devcontainer, on vérifie si le repo n'a pas déjà été cloné par envbuilder
-if [ ! -z "$DEVCONTAINER_GITHUB_URL" ]; then
-  echo "[+] Devcontainer: vérification du dépôt $DEVCONTAINER_GITHUB_URL"
+# Clone le dépôt Git spécifié par l'utilisateur
+if [ ! -z "$GIT_REPO" ]; then
+  echo "[+] Clonage du dépôt Git: $GIT_REPO"
+  mkdir -p ~/projects
+  cd ~/projects
   
   # Extraction du nom du dépôt depuis l'URL
-  REPO_NAME=$(basename "$DEVCONTAINER_GITHUB_URL" .git)
+  REPO_NAME=$(basename "$GIT_REPO" .git)
   
-  # Si le répertoire n'existe pas déjà, on clone le dépôt
-  if [ ! -d "$HOME/projects/$REPO_NAME" ]; then
-    echo "[+] Clonage du dépôt devcontainer dans ~/projects/$REPO_NAME"
-    mkdir -p $HOME/projects
-    cd $HOME/projects
-    
+  # Vérification si le répertoire existe déjà
+  if [ -d "$REPO_NAME" ]; then
+    echo "[*] Le répertoire du dépôt existe déjà, mise à jour..."
+    cd "$REPO_NAME"
+    git pull || echo "AVERTISSEMENT: échec de git pull - des modifications locales peuvent exister"
+  else
     # Clonage avec gestion avancée des erreurs
-    GIT_TERMINAL_PROMPT=0 git clone --depth=1 "$DEVCONTAINER_GITHUB_URL" \
+    echo "[+] Clonage du dépôt avec options avancées..."
+    GIT_TERMINAL_PROMPT=0 git clone --depth=1 "$GIT_REPO" \
       --config http.sslVerify=false \
       --config http.postBuffer=524288000 \
       --config core.compression=0 \
       --config http.lowSpeedLimit=1000 \
       --config http.lowSpeedTime=60 \
-      || echo "[!] Échec du clonage automatique du dépôt devcontainer"
-  else
-    echo "[*] Le répertoire du dépôt devcontainer existe déjà"
-  fi
-fi
-
-# Clone Git repository if URL is provided (dépôt supplémentaire)
-if [ ! -z "$GIT_REPO" ]; then
-  echo "[+] Cloning Git repository: $GIT_REPO"
-  mkdir -p ~/projects
-  cd ~/projects
-  
-  # Extract repo name from URL
-  REPO_NAME=$(basename "$GIT_REPO" .git)
-  
-  # Check if directory already exists
-  if [ -d "$REPO_NAME" ]; then
-    echo "[*] Repository directory already exists, updating instead"
-    cd "$REPO_NAME"
-    git pull || echo "AVERTISSEMENT: échec de git pull - des modifications locales peuvent exister"
-  else
-    # Clonage avec gestion d'erreur et options avancées
-    echo "[+] Clonage du dépôt avec options avancées..."
-    
-    # Essayer différentes méthodes si le clonage standard échoue
-    if ! GIT_TERMINAL_PROMPT=0 git clone --depth=1 "$GIT_REPO" --config http.sslVerify=false; then
-      echo "[!] Premier essai échoué, nouvelle tentative avec options différentes..."
+      || echo "[!] Échec du clonage automatique du dépôt"
       
-      if ! GIT_TERMINAL_PROMPT=0 git clone --depth=1 "$GIT_REPO" --config http.sslVerify=false --config http.postBuffer=524288000; then
-        echo "[!] Seconde tentative échouée, essai avec protocole Git..."
+    # Si le clonage a réussi, vérifier la présence d'une configuration devcontainer
+    if [ -d "$REPO_NAME" ]; then
+      cd "$REPO_NAME"
+      
+      # Vérifier si le dépôt contient un fichier devcontainer.json
+      if [ -f ".devcontainer/devcontainer.json" ] || [ -f ".devcontainer.json" ]; then
+        echo "[+] Configuration devcontainer détectée dans le dépôt"
         
-        # Convertir URL HTTPS en Git si nécessaire
-        GIT_URL=$(echo "$GIT_REPO" | sed 's|https://github.com/|git://github.com/|')
-        
-        if [ "$GIT_REPO" != "$GIT_URL" ] && ! GIT_TERMINAL_PROMPT=0 git clone --depth=1 "$GIT_URL"; then
-          echo "[x] Échec du clonage après plusieurs tentatives. Créez un répertoire vide."
-          mkdir -p "$REPO_NAME"
-          echo "# Placeholder for $REPO_NAME" > "$REPO_NAME/README.md"
-          echo "Le clonage automatique a échoué. Veuillez cloner manuellement ce dépôt." >> "$REPO_NAME/README.md"
+        if [ "${data.coder_parameter.use_devcontainer.value}" = "true" ]; then
+          echo "[+] Mode devcontainer activé, utilisation de la configuration du dépôt"
+          # Les instructions spécifiques au devcontainer seront gérées par envbuilder
+        else
+          echo "[*] Mode devcontainer non activé. Pour utiliser la configuration devcontainer, redémarrez l'environnement en activant cette option."
         fi
+      else
+        echo "[*] Aucune configuration devcontainer trouvée dans le dépôt"
       fi
     fi
   fi
@@ -304,9 +284,9 @@ cat > $HOME/.coder/status.json <<EOF
     "name": "${local.workspace_name}",
     "owner": "${local.user_name}",
     "created_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-    "image": "${data.coder_parameter.environment_type.value == "devcontainer" ? "devcontainer" : data.coder_parameter.docker_image.value}",
-    "devcontainer_repo": "${data.coder_parameter.repo_url.value}",
-    "git_repo": "${data.coder_parameter.git_repository.value}"
+    "image": "${local.use_devcontainer ? "devcontainer" : data.coder_parameter.docker_image.value}",
+    "git_repo": "${data.coder_parameter.git_repository.value}",
+    "devcontainer_enabled": "${data.coder_parameter.use_devcontainer.value}"
   }
 }
 EOF
@@ -398,36 +378,39 @@ variable "cache_repo_docker_config_path" {
 }
 
 # Paramètres organisés en sections logiques
-# 1. Choix du type d'environnement (standard ou devcontainer)
-data "coder_parameter" "environment_type" {
-  name        = "Type d'environnement"
-  description = "Choisissez entre un environnement prédéfini ou une configuration personnalisée via devcontainer"
+# 1. Choix du dépôt Git à importer
+data "coder_parameter" "git_repository" {
+  name        = "Dépôt Git à cloner"
+  description = "URL du dépôt Git à cloner dans votre espace de travail"
   type        = "string"
-  default     = "standard"
-  mutable     = true
+  default     = ""
   order       = 1
+  mutable     = true
   
-  option {
-    name  = "Environnement prédéfini"
-    value = "standard"
-    icon  = "/icon/terminal.svg"
-  }
-  
-  option {
-    name  = "DevContainer personnalisé"
-    value = "devcontainer"
-    icon  = "/icon/docker.svg"
+  validation {
+    regex = "^(|https?://|git@).*"
+    error = "Git doit être une URL valide commençant par http://, https:// ou git@, ou être vide"
   }
 }
 
-# 2. Options pour l'environnement standard
+# 2. Choix du mode d'environnement (devcontainer ou prédéfini)
+data "coder_parameter" "use_devcontainer" {
+  name        = "Utiliser la configuration DevContainer"
+  description = "Si le dépôt contient un fichier devcontainer.json, l'utiliser pour configurer l'environnement"
+  type        = "bool"
+  default     = "false"
+  mutable     = true
+  order       = 2
+}
+
+# 3. Options pour l'environnement standard (utilisé seulement si devcontainer = false)
 data "coder_parameter" "docker_image" {
   name        = "Image de développement"
-  description = "Choisissez l'environnement de développement adapté à votre projet. ${data.coder_parameter.environment_type.value != "standard" ? "(Uniquement applicable si 'Environnement prédéfini' est sélectionné)" : ""}"
+  description = "Choisissez l'environnement de développement adapté à votre projet. (Uniquement applicable si 'Utiliser la configuration DevContainer' = Non)"
   type        = "string"
   default     = "base"
   mutable     = true
-  order       = 2
+  order       = 3
 
   option {
     name  = "JavaScript"
@@ -466,24 +449,10 @@ data "coder_parameter" "docker_image" {
   }
 }
 
-# 3. Options pour l'environnement DevContainer
-data "coder_parameter" "repo_url" {
-  name        = "URL du dépôt devcontainer"
-  description = data.coder_parameter.environment_type.value == "devcontainer" ? "URL du dépôt Git contenant une configuration devcontainer.json à utiliser pour construire l'environnement personnalisé" : "URL du dépôt Git avec devcontainer.json (applicable uniquement si 'DevContainer personnalisé' est sélectionné)"
-  type        = "string"
-  mutable     = true
-  default     = ""
-  order       = 3
-
-  validation {
-    regex = "^(|https?://|git@).*"
-    error = "Doit être une URL Git valide commençant par http://, https:// ou git@"
-  }
-}
-
+# 4. Options pour le devcontainer
 data "coder_parameter" "fallback_image" {
   name        = "Image de secours"
-  description = "Cette image sera utilisée si la construction du devcontainer échoue. ${data.coder_parameter.environment_type.value != "devcontainer" ? "(Uniquement applicable si 'DevContainer personnalisé' est sélectionné)" : ""}"
+  description = "Cette image sera utilisée si la construction du devcontainer échoue. (Uniquement applicable si 'Utiliser la configuration DevContainer' = Oui)"
   type        = "string"
   mutable     = true
   order       = 4
@@ -525,7 +494,7 @@ data "coder_parameter" "fallback_image" {
 
 data "coder_parameter" "devcontainer_builder" {
   name        = "Image de construction"
-  description = "Image qui construira le devcontainer (recommandation: utilisez une version spécifique). ${data.coder_parameter.environment_type.value != "devcontainer" ? "(Uniquement applicable si 'DevContainer personnalisé' est sélectionné)" : ""}"
+  description = "Image qui construira le devcontainer. (Uniquement applicable si 'Utiliser la configuration DevContainer' = Oui)"
   mutable     = true
   default     = "ghcr.io/coder/envbuilder:latest"
   order       = 5
@@ -539,21 +508,6 @@ data "coder_parameter" "devcontainer_builder" {
   option {
     name  = "v0.3.10"
     value = "ghcr.io/coder/envbuilder:v0.3.10"
-  }
-}
-
-# 4. Options communes - Git
-data "coder_parameter" "git_repository" {
-  name        = "Dépôt Git à cloner"
-  description = "URL d'un dépôt Git à cloner automatiquement (différent du dépôt DevContainer)"
-  type        = "string"
-  default     = ""
-  order       = 6
-  mutable     = true
-  
-  validation {
-    regex = "^(|https?://|git@).*"
-    error = "Git doit être une URL valide commençant par http://, https:// ou git@, ou être vide"
   }
 }
 
@@ -696,7 +650,7 @@ resource "docker_container" "devcontainer" {
       "CODER_AGENT_TOKEN=${coder_agent.dev.token}",
       "GIT_HTTP_TIMEOUT=${local.git_timeout_seconds}",
       "GIT_DISCOVERY_ACROSS_FILESYSTEM=1",
-      "DEVCONTAINER_GITHUB_URL=${data.coder_parameter.repo_url.value}", # URL du dépôt automatiquement transmise
+      "DEVCONTAINER_GITHUB_URL=${data.coder_parameter.git_repository.value}", # Utilisation du paramètre commun git_repository
       "BUILD_START_TIME=${timestamp()}" # Pour suivre le temps de construction
     ],
     local.docker_env
@@ -750,7 +704,7 @@ resource "docker_container" "devcontainer" {
   
   labels {
     label = "devcontainer.repository_url"
-    value = data.coder_parameter.repo_url.value
+    value = data.coder_parameter.git_repository.value
   }
 }
 
