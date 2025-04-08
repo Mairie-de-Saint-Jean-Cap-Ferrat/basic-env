@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM mcr.microsoft.com/devcontainers/base:dev-ubuntu
 
 USER root
 

@@ -1,16 +1,5 @@
 {
-  "name": "mairie-de-saint-jean-cap-ferrat/basic-env - Java",
-  "image": "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest",
-
-  "features": {
-    "ghcr.io/devcontainers/features/java:1": {
-      "jdkDistro": "tem"
-    }
-  },
-
-  "customizations": {
-    "vscode": {
-      "extensions": [
+    "recommendations": [
         "coder.coder-remote",
         "mads-hartmann.bash-ide-vscode",
         "ms-dotnettools.vscode-dotnet-runtime",
@@ -90,22 +79,5 @@
         "Jota0222.multi-formatter",
         "adautomendes.yaml2table-preview",
         "ms-vscode-remote.remote-containers"
-      ],
-
-      "settings": {
-        "json.schemas": [
-          {
-            "fileMatch": ["*/devcontainer-feature.json"],
-            "url": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainerFeature.schema.json"
-          }
-        ],
-        "editor.formatOnSave": true,
-        "editor.codeActionsOnSave": {
-          "source.formatDocument": "always"
-        }
-      }
-    }
-  },
-  
-  "remoteUser": "coder"
+    ]
 }
