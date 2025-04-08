@@ -86,7 +86,7 @@ data "coder_parameter" "custom_repo_url" {
 }
 
 data "coder_parameter" "fallback_image" {
-  default      = "codercom/enterprise-base:ubuntu"
+  default      = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest"
   description  = "This image runs if the devcontainer fails to build."
   display_name = "Fallback Image"
   mutable      = true
@@ -132,6 +132,7 @@ locals {
   git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
   git_author_email           = data.coder_workspace_owner.me.email
   repo_url                   = data.coder_parameter.repo.value == "custom" ? data.coder_parameter.custom_repo_url.value : data.coder_parameter.repo.value
+  folder_name                = "."
   # The envbuilder provider requires a key-value map of environment variables.
   envbuilder_env = {
     # ENVBUILDER_GIT_URL and ENVBUILDER_CACHE_REPO will be overridden by the provider
@@ -217,7 +218,7 @@ resource "docker_container" "workspace" {
     ip   = "host-gateway"
   }
   volumes {
-    container_path = "/workspaces/${module.git_clone[count.index].folder_name}"
+    container_path = "/workspaces"
     volume_name    = docker_volume.workspaces.name
     read_only      = false
   }
@@ -248,7 +249,7 @@ resource "coder_agent" "main" {
 
     # Add any commands that should be executed at workspace startup (e.g install requirements, start a program, etc) here
   EOT
-  dir            = "/workspaces/${module.git_clone[count.index].folder_name}"
+  dir            = "/workspaces" # Utilisation de la variable locale
 
   # These environment variables allow you to make Git commits right away after creating a
   # workspace. Note that they take precedence over configuration defined in ~/.gitconfig!
@@ -328,18 +329,13 @@ resource "coder_agent" "main" {
   }
 }
 
-data "coder_parameter" "git_repo" {
-  name         = "git_repo"
-  display_name = "Git repository"
-  default      = "https://github.com/coder/coder/tree/feat/example"
-}
 
 module "cursor" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/modules/cursor/coder"
   version  = "1.0.19"
   agent_id = coder_agent.main.id
-  folder   = "/workspaces/${module.git_clone[count.index].folder_name}"
+  folder   = "/workspaces"
 }
 
 module "filebrowser" {
@@ -347,9 +343,8 @@ module "filebrowser" {
   source   = "registry.coder.com/modules/filebrowser/coder"
   version  = "1.0.30"
   agent_id = coder_agent.main.id
-  agent_name = coder_agent.main.name
-  folder = "/workspaces/${module.git_clone[count.index].folder_name}"
-  subdomain = false
+  agent_name = "main"
+  folder = "/workspaces"
 }
 
 module "dotfiles" {
@@ -366,7 +361,7 @@ module "dotfiles-root" {
   version      = "1.0.29"
   agent_id     = coder_agent.main.id
   user         = "root"
-  dotfiles_uri = module.dotfiles.dotfiles_uri
+  dotfiles_uri = module.dotfiles[count.index].dotfiles_uri
 }
 
 # See https://registry.coder.com/modules/code-server
@@ -379,7 +374,7 @@ module "code-server" {
 
   agent_id = coder_agent.main.id
   order    = 1
-  folder   = "/workspaces/${module.git_clone[count.index].folder_name}"
+  folder   = "/workspaces"
 }
 
 module "git-config" {
@@ -388,16 +383,6 @@ module "git-config" {
   version            = "1.0.15"
   agent_id           = coder_agent.main.id
   allow_email_change = true
-}
-
-module "git_clone" {
-  count       = data.coder_workspace.me.start_count
-  source      = "registry.coder.com/modules/git-clone/coder"
-  version     = "1.0.18"
-  agent_id    = coder_agent.main.id
-  url         = "https://github.com/coder/coder"
-  folder_name = "coder-dev"
-  base_dir    = "/workspaces"
 }
 
 resource "coder_metadata" "container_info" {
