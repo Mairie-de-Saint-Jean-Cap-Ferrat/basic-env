@@ -67,7 +67,6 @@
     "ghcr.io/devcontainers-extra/features/vscode-server:1": {
       "version": "latest"
     },
-    "ghcr.io/joshuanianji/devcontainer-features/mount-pnpm-store:1": {},
     "ghcr.io/devcontainers/features/desktop-lite:1": {
       "version": "latest",
       "noVncVersion": "1.2.0",
