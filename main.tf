@@ -92,6 +92,41 @@ data "coder_parameter" "fallback_image" {
   mutable      = true
   name         = "fallback_image"
   order        = 3
+  # Options prédéfinies pour faciliter la sélection
+  option {
+    name  = "JavaScript"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/javascript:latest"
+  }
+  
+  option {
+    name  = "TypeScript"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/typescript:latest"
+  }
+  
+  option {
+    name  = "PHP"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/php:latest"
+  }
+  
+  option {
+    name  = "Java"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/java:latest"
+  }
+  
+  option {
+    name  = "Python"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/python:latest"
+  }
+  
+  option {
+    name  = "Dart"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/dart:latest"
+  }
+  
+  option {
+    name  = "Base"
+    value = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest"
+  }
 }
 
 data "coder_parameter" "devcontainer_builder" {
@@ -336,15 +371,6 @@ module "cursor" {
   version  = "1.0.19"
   agent_id = coder_agent.main.id
   folder   = "/workspaces"
-}
-
-module "filebrowser" {
-  count    = data.coder_workspace.me.start_count
-  source   = "registry.coder.com/modules/filebrowser/coder"
-  version  = "1.0.30"
-  agent_id = coder_agent.main.id
-  agent_name = "main"
-  folder = "/workspaces"
 }
 
 module "dotfiles" {
