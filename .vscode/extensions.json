@@ -86,6 +86,7 @@
         "ritwickdey.LiveServer",
         "genaiscript.genaiscript-vscode",
         "Jota0222.multi-formatter",
-        "adautomendes.yaml2table-preview"
+        "adautomendes.yaml2table-preview",
+        "ms-vscode-remote.remote-containers"
     ]
 }
