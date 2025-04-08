@@ -458,12 +458,13 @@ variable "cache_repo_docker_config_path" {
 # Paramètres organisés en sections logiques
 # 1. Choix du dépôt Git à importer
 data "coder_parameter" "git_repository" {
-  name        = "Dépôt Git à cloner"
+  name        = "📂 Dépôt Git à cloner"
   description = "URL du dépôt Git à cloner dans votre espace de travail"
   type        = "string"
   default     = ""
   order       = 1
   mutable     = true
+  icon        = "/icon/git.svg"
   
   validation {
     regex = "^(|https?://|git@).*"
@@ -473,17 +474,18 @@ data "coder_parameter" "git_repository" {
 
 # 2. Choix du mode d'environnement (devcontainer ou prédéfini)
 data "coder_parameter" "use_devcontainer" {
-  name        = "Utiliser la configuration DevContainer"
+  name        = "🛠️ Utiliser la configuration DevContainer"
   description = "Si le dépôt contient un fichier devcontainer.json, l'utiliser pour configurer l'environnement"
   type        = "bool"
   default     = "false"
   mutable     = true
   order       = 2
+  icon        = "/icon/docker.svg"
 }
 
 # 3. Options pour l'environnement standard (utilisé seulement si devcontainer = false)
 data "coder_parameter" "docker_image" {
-  name        = "Image de développement"
+  name        = "🐳 Image de développement"
   description = "Choisissez l'environnement de développement adapté à votre projet. (Uniquement applicable si 'Utiliser la configuration DevContainer' = Non)"
   type        = "string"
   default     = "base"
@@ -535,11 +537,12 @@ data "coder_parameter" "docker_image" {
 
 # 4. Options pour le devcontainer
 data "coder_parameter" "fallback_image" {
-  name        = "Image de secours"
+  name        = "🔄 Image de secours"
   description = "Cette image sera utilisée si la construction du devcontainer échoue. (Uniquement applicable si 'Utiliser la configuration DevContainer' = Oui)"
   type        = "string"
   mutable     = true
   order       = 4
+  icon        = "/icon/docker.svg"
   
   # Utilise l'image de base comme valeur par défaut
   default     = "ghcr.io/mairie-de-saint-jean-cap-ferrat/basic-env/base:latest"
@@ -582,11 +585,12 @@ data "coder_parameter" "fallback_image" {
 }
 
 data "coder_parameter" "devcontainer_builder" {
-  name        = "Image de construction"
+  name        = "🏗️ Image de construction"
   description = "Image qui construira le devcontainer. (Uniquement applicable si 'Utiliser la configuration DevContainer' = Oui)"
   mutable     = true
   default     = "ghcr.io/coder/envbuilder:latest"
   order       = 5
+  icon        = "/icon/docker.svg"
   
   # Options pour différentes versions
   option {
@@ -602,7 +606,7 @@ data "coder_parameter" "devcontainer_builder" {
 
 # 5. Options d'interface utilisateur
 data "coder_parameter" "vnc" {
-  name        = "Interface graphique (VNC)"
+  name        = "🖥️ Interface graphique (VNC)"
   description = "Activer une interface bureau à distance via noVNC"
   type        = "bool"
   default     = "true"
@@ -613,12 +617,13 @@ data "coder_parameter" "vnc" {
 
 # 6. Options de personnalisation
 data "coder_parameter" "shell" {
-  name        = "Shell par défaut"
+  name        = "🐚 Shell par défaut"
   description = "Choisissez votre shell préféré"
   type        = "string"
   default     = "bash"
   order       = 8
   mutable     = true
+  icon        = "/icon/terminal.svg"
 
   option {
     name  = "Bash"
@@ -640,12 +645,13 @@ data "coder_parameter" "shell" {
 }
 
 data "coder_parameter" "vscode_binary" {
-  name        = "Version VS Code"
+  name        = "💻 Version VS Code"
   description = "Choisissez entre la version stable ou Insiders de VS Code"
   type        = "string"
   default     = "code"
   order       = 9
   mutable     = true
+  icon        = "/icon/vscode.svg"
 
   option {
     name  = "Stable"
@@ -662,75 +668,83 @@ data "coder_parameter" "vscode_binary" {
 
 # 7. Options pour les extensions VS Code
 data "coder_parameter" "vscode_extensions_git" {
-  name        = "Extensions Git"
+  name        = "🔄 Extensions Git"
   description = "Activer les extensions Git pour VS Code"
   type        = "bool"
   default     = "true"
   order       = 10
   mutable     = true
+  icon        = "/icon/git.svg"
 }
 
 data "coder_parameter" "vscode_extensions_github_copilot" {
-  name        = "Extensions GitHub Copilot"
+  name        = "🤖 Extensions GitHub Copilot"
   description = "Activer les extensions GitHub Copilot pour VS Code"
   type        = "bool"
   default     = "true"
   order       = 11
   mutable     = true
+  icon        = "/icon/github.svg"
 }
 
 data "coder_parameter" "vscode_extensions_languages" {
-  name        = "Extensions de Langages"
+  name        = "📝 Extensions de Langages"
   description = "Activer les extensions de langages pour VS Code"
   type        = "bool"
   default     = "true"
   order       = 12
   mutable     = true
+  icon        = "/icon/code.svg"
 }
 
 data "coder_parameter" "vscode_extensions_productivity" {
-  name        = "Extensions de Productivité"
+  name        = "⚡ Extensions de Productivité"
   description = "Activer les extensions de productivité pour VS Code"
   type        = "bool"
   default     = "true"
   order       = 13
   mutable     = true
+  icon        = "/icon/productivity.svg"
 }
 
 data "coder_parameter" "vscode_extensions_viewers" {
-  name        = "Extensions de Visionneuses"
+  name        = "👁️ Extensions de Visionneuses"
   description = "Activer les extensions de visionneuses pour VS Code"
   type        = "bool"
   default     = "true"
   order       = 14
   mutable     = true
+  icon        = "/icon/preview.svg"
 }
 
 data "coder_parameter" "vscode_extensions_collaboration" {
-  name        = "Extensions de Collaboration"
+  name        = "👥 Extensions de Collaboration"
   description = "Activer les extensions de collaboration pour VS Code"
   type        = "bool"
   default     = "true"
   order       = 15
   mutable     = true
+  icon        = "/icon/collaboration.svg"
 }
 
 data "coder_parameter" "vscode_extensions_intelligence" {
-  name        = "Extensions d'Intelligence"
+  name        = "🧠 Extensions d'Intelligence"
   description = "Activer les extensions d'intelligence pour VS Code"
   type        = "bool"
   default     = "true"
   order       = 16
   mutable     = true
+  icon        = "/icon/intellicode.svg"
 }
 
 data "coder_parameter" "vscode_extensions_server" {
-  name        = "Extensions de Serveur"
+  name        = "🌐 Extensions de Serveur"
   description = "Activer les extensions de serveur pour VS Code"
   type        = "bool"
   default     = "true"
   order       = 17
   mutable     = true
+  icon        = "/icon/server.svg"
 }
 
 resource "docker_container" "workspace" {
@@ -1226,4 +1240,129 @@ resource "coder_metadata" "base_image" {
 data "local_sensitive_file" "cache_repo_dockerconfigjson" {
   count    = var.cache_repo_docker_config_path == "" ? 0 : 1
   filename = var.cache_repo_docker_config_path
+}
+
+resource "coder_metadata" "extensions" {
+  count = data.coder_workspace.me.start_count
+  resource_id = module.vscode-web[0].id
+  icon = "/icon/vscode.svg"
+  order = 2
+  
+  item {
+    key   = "🔄 Extensions Git"
+    value = data.coder_parameter.vscode_extensions_git.value == "true" ? "Activées" : "Désactivées"
+  }
+  
+  item {
+    key   = "🤖 Extensions GitHub Copilot"
+    value = data.coder_parameter.vscode_extensions_github_copilot.value == "true" ? "Activées" : "Désactivées"
+  }
+  
+  item {
+    key   = "📝 Extensions de Langages"
+    value = data.coder_parameter.vscode_extensions_languages.value == "true" ? "Activées" : "Désactivées"
+  }
+  
+  item {
+    key   = "⚡ Extensions de Productivité"
+    value = data.coder_parameter.vscode_extensions_productivity.value == "true" ? "Activées" : "Désactivées"
+  }
+  
+  item {
+    key   = "👁️ Extensions de Visionneuses"
+    value = data.coder_parameter.vscode_extensions_viewers.value == "true" ? "Activées" : "Désactivées"
+  }
+  
+  item {
+    key   = "👥 Extensions de Collaboration"
+    value = data.coder_parameter.vscode_extensions_collaboration.value == "true" ? "Activées" : "Désactivées"
+  }
+  
+  item {
+    key   = "🧠 Extensions d'Intelligence"
+    value = data.coder_parameter.vscode_extensions_intelligence.value == "true" ? "Activées" : "Désactivées"
+  }
+  
+  item {
+    key   = "🌐 Extensions de Serveur"
+    value = data.coder_parameter.vscode_extensions_server.value == "true" ? "Activées" : "Désactivées"
+  }
+  
+  item {
+    key   = "📊 Nombre total d'extensions"
+    value = length(local.selected_extensions)
+  }
+}
+
+# Ajout de métadonnées détaillées pour les extensions installées
+resource "coder_metadata" "extensions_detail" {
+  count = data.coder_workspace.me.start_count
+  resource_id = module.vscode-web[0].id
+  icon = "/icon/extension.svg"
+  order = 3
+  hide = true
+  
+  dynamic "item" {
+    for_each = data.coder_parameter.vscode_extensions_git.value == "true" ? local.vscode_extensions.git : []
+    content {
+      key   = "Git: ${split(".", item.value)[1]}"
+      value = item.value
+    }
+  }
+  
+  dynamic "item" {
+    for_each = data.coder_parameter.vscode_extensions_github_copilot.value == "true" ? local.vscode_extensions.github_copilot : []
+    content {
+      key   = "GitHub Copilot: ${split(".", item.value)[1]}"
+      value = item.value
+    }
+  }
+  
+  dynamic "item" {
+    for_each = data.coder_parameter.vscode_extensions_languages.value == "true" ? local.vscode_extensions.languages : []
+    content {
+      key   = "Langage: ${split(".", item.value)[1]}"
+      value = item.value
+    }
+  }
+  
+  dynamic "item" {
+    for_each = data.coder_parameter.vscode_extensions_productivity.value == "true" ? local.vscode_extensions.productivity : []
+    content {
+      key   = "Productivité: ${split(".", item.value)[1]}"
+      value = item.value
+    }
+  }
+  
+  dynamic "item" {
+    for_each = data.coder_parameter.vscode_extensions_viewers.value == "true" ? local.vscode_extensions.viewers : []
+    content {
+      key   = "Visionneuse: ${split(".", item.value)[1]}"
+      value = item.value
+    }
+  }
+  
+  dynamic "item" {
+    for_each = data.coder_parameter.vscode_extensions_collaboration.value == "true" ? local.vscode_extensions.collaboration : []
+    content {
+      key   = "Collaboration: ${split(".", item.value)[1]}"
+      value = item.value
+    }
+  }
+  
+  dynamic "item" {
+    for_each = data.coder_parameter.vscode_extensions_intelligence.value == "true" ? local.vscode_extensions.intelligence : []
+    content {
+      key   = "Intelligence: ${split(".", item.value)[1]}"
+      value = item.value
+    }
+  }
+  
+  dynamic "item" {
+    for_each = data.coder_parameter.vscode_extensions_server.value == "true" ? local.vscode_extensions.server : []
+    content {
+      key   = "Serveur: ${split(".", item.value)[1]}"
+      value = item.value
+    }
+  }
 }
