@@ -67,6 +67,10 @@
     "ghcr.io/devcontainers-extra/features/vscode-server:1": {
       "version": "latest"
     },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts",
+      "installYarnUsingApt": false
+    },
     "ghcr.io/devcontainers/features/desktop-lite:1": {
       "version": "latest",
       "noVncVersion": "1.2.0",
