@@ -27,7 +27,6 @@
         "ms-semantic-kernel.semantic-kernel",
         "VisionAIDevKit.vision-ai-devkit",
         "ms-vscode.vscode-commander",
-        "ms-toolsai.vscode-ai-remote",
         "BeardedBear.beardedtheme",
         "GitHub.remotehub",
         "ms-vscode.remote-repositories",
